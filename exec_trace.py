@@ -24,6 +24,11 @@ class CodeBlock():
   def add_subroutine_call(self, instr_address, routine_address):
     self.subroutines[instr_address] = routine_address
 
+def hex8(v):
+  return "0x%02X" % v
+
+def hex16(v):
+  return "0x%04X" % v
 
 ERROR = 0   # only critical messages
 VERBOSE = 1 # informative non-error msgs to the user
@@ -274,7 +279,8 @@ class ExecTrace():
     asm = open(filename, "w")
     asm.write(self.output_disasm_headers())
 
-    asm.write("org 0x%04X\n" % self.relocation_address)
+    asm.write("\t.area _HEADER (ABS)\n")
+    asm.write("\t.org %s\n" % hex16(self.relocation_address))
     next_addr = self.relocation_address
     for codeblock in sorted(self.visited_ranges, key=lambda cb: cb.start):
       if codeblock.start < next_addr:
@@ -284,23 +290,23 @@ class ExecTrace():
         continue
 
       if codeblock.start > next_addr:
-        indent = "LABEL_%04X: " % next_addr
+        indent = "LABEL_%04X:\n\t" % next_addr
         data = []
         for addr in range(next_addr, codeblock.start):
-          data.append("0x%02X" % ord(self.rom[self.rombank + addr]))
+          data.append(hex8(ord(self.rom[self.rombank + addr])))
           if len(data) == 8:
-            asm.write("{}db {}\n".format(indent, ", ".join(data)))
-            indent = "            "
+            asm.write("{}.db {}\n".format(indent, ", ".join(data)))
+            indent = "\t"
             data = []
         if len(data) > 0:
-          asm.write("{}db {}\n".format(indent, ", ".join(data)))
+          asm.write("{}.db {}\n".format(indent, ", ".join(data)))
 
       address = codeblock.start
-      indent = "LABEL_%04X: " % address
+      indent = "LABEL_%04X:\n\t" % address
       for address in range(codeblock.start, codeblock.end+1):
         if address in self.disasm:
           asm.write("%s%s\n" % (indent, self.disasm[address]))
-          indent = "            "
+          indent = "\t"
       next_addr = codeblock.end + 1
     asm.close()
 

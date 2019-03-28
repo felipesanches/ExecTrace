@@ -312,20 +312,21 @@ class MSX_Trace(ExecTrace):
 
 
 
-    elif opcode == 0xe6: # 
+    elif opcode == 0xE6: # 
       imm = self.fetch()
       return "and 0x%02X" % imm
 
-    elif opcode == 0xe9:
+    elif opcode == 0xE9:
       register_jump_table(self.PC-1)
       return "jp (hl)"
 
-    elif opcode == 0xed: # EXTENDED INSTRUCTIONS:
+    elif opcode == 0xED: # EXTENDED INSTRUCTIONS:
       ext_opcode = self.fetch()
 
       ext_instructions = {
         0x44: "neg",
         0x4C: "neg",
+        0x52: "sbc hl, de",
         0x54: "neg",
         0x5C: "neg",
         0x64: "neg",

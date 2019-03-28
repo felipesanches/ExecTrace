@@ -274,7 +274,8 @@ class ExecTrace():
     asm = open(filename, "w")
     asm.write(self.output_disasm_headers())
 
-    next_addr = 0
+    asm.write("org 0x%04X\n" % self.relocation_address)
+    next_addr = self.relocation_address
     for codeblock in sorted(self.visited_ranges, key=lambda cb: cb.start):
       if codeblock.start < next_addr:
         # Skip repeated blocks!

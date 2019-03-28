@@ -113,6 +113,12 @@ class MSX_Trace(ExecTrace):
       self.unconditional_jump(addr)
       return "jr %s" % get_label(addr)
 
+    elif opcode == 0x20:
+      imm = self.fetch()
+      addr = self.PC - 2 + imm - 128
+      self.conditional_branch(addr)
+      return "jr nz, %s" % get_label(addr)
+
     elif opcode == 0x22: # 
       imm = self.fetch()
       imm = imm | (self.fetch() << 8)
@@ -197,6 +203,11 @@ class MSX_Trace(ExecTrace):
       if ext_opcode in ext_instructions:
         return ext_instructions[ext_opcode]
 
+      elif ext_opcode & 0xC0 == 0x00: # bit rotates and shifts
+        STR1 = ['rlc', 'rrc', 'rl', 'rr', 'sla', 'sra', 'sll', 'srl']
+        STR2 = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+        return "%s %s" % (STR1[(ext_opcode >> 3) & 0x07], STR2[ext_opcode & 0x07])
+
       elif ext_opcode & 0xC0 == 0x40: # bit n, ??
         STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
         n = (ext_opcode >> 3) & 7
@@ -237,6 +248,14 @@ class MSX_Trace(ExecTrace):
       ext_opcode = self.fetch()
 
       ext_instructions = {
+        0x44: "neg",
+        0x4C: "neg",
+        0x54: "neg",
+        0x5C: "neg",
+        0x64: "neg",
+        0x6C: "neg",
+        0x74: "neg",
+        0x7C: "neg",
         0xb0: "ldir",
       }
       if ext_opcode in ext_instructions:

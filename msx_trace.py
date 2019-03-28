@@ -1,19 +1,35 @@
 #!/usr/bin/env python
+import sys
 
 from exec_trace import ExecTrace
+
 OUTPUT_DIR = "output"
 romset_dir = None
 
 KNOWN_VARS = {}
+KNOWN_SUBROUTINES = {
+  0x0047: ("WRTVDP", "Writes to the VDP register."),
+  0x0138: ("RSLREG", "Reads the current output to the primary slot register."),
+  0x013B: ("WSLREG", "Writes to the primary slot register."),
+}
 
 def getVariableName(addr):
-  if value in KNOWN_VARS.keys():
+  if addr in KNOWN_VARS.keys():
     return KNOWN_VARS[addr]
   else:
-    return "0x%04X" % value
+    return "0x%04X" % addr
+
+def get_subroutine_comment(addr):
+  if addr in KNOWN_SUBROUTINES.keys():
+    return KNOWN_SUBROUTINES[addr][1]
 
 def get_label(addr):
-  return "LABEL_%04X" % addr
+  if addr in KNOWN_SUBROUTINES.keys():
+    return KNOWN_SUBROUTINES[addr][0]
+  elif addr < 0x4000:
+    sys.exit("Unknown BIOS call: %04X" % addr)
+  else:
+    return "LABEL_%04X" % addr
 
 class MSX_Trace(ExecTrace):
   def output_disasm_headers(self):
@@ -31,7 +47,12 @@ class MSX_Trace(ExecTrace):
       #0x03: "inc bc",
       #0x04: "inc b",
       0x07: "rlca",
+      0x08: "ex af, af'",
+      0x0f: "rrca",
+      0x12: "ld (de), a",
       0x17: "rla",
+      0x1f: "rra",
+      0x2f: "cpl",
     }
 
     if opcode in simple_instructions:
@@ -39,14 +60,23 @@ class MSX_Trace(ExecTrace):
 
     elif opcode & 0xCF == 0x01: # ld ??, word
       STR = ['bc', 'de', 'hl', 'sp']
-      immediate = self.fetch()
-      immediate = immediate | (self.fetch() << 8)
-      return "ld %s, 0x%04X" % (STR[(opcode >> 4) & 3], immediate)
+      imm = self.fetch()
+      imm = imm | (self.fetch() << 8)
+      return "ld %s, 0x%04X" % (STR[(opcode >> 4) & 3], imm)
+
+    elif opcode & 0xCF == 0x03: # inc reg
+      STR = ['bc', 'de', 'hl', 'sp']
+      return "inc %s" % STR[(opcode >> 4) & 3]
 
     elif opcode & 0xCF == 0x06: # ld ??, byte
       STR = ['b', 'd', 'hl', '(hl)']
-      immediate = self.fetch()
-      return "ld %s, 0x%02X" % (STR[(opcode >> 4) & 3], immediate)
+      imm = self.fetch()
+      return "ld %s, 0x%02X" % (STR[(opcode >> 4) & 3], imm)
+
+    elif opcode & 0xCF == 0x0E: # ld reg, byte
+      STR = ['c', 'e', 'l', 'a']
+      imm = self.fetch()
+      return "ld %s, 0x%02X" % (STR[(opcode >> 4) & 3], imm)
 
     elif opcode == 0x28:
       imm = self.fetch()
@@ -59,10 +89,18 @@ class MSX_Trace(ExecTrace):
       imm = imm | (self.fetch() << 8)
       return "ld (0x%04X), a" % imm
 
+    elif opcode == 0x3e: # 
+      imm = self.fetch()
+      return "ld a, 0x%02X" % imm
+
     elif opcode == 0x3a: # 
       imm = self.fetch()
       imm = imm | (self.fetch() << 8)
       return "ld a, (0x%04X)" % imm
+
+    elif opcode == 0x76:
+      self.return_from_subroutine()
+      return "halt"
 
     elif opcode & 0xF8 == 0x40: # ld b, ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
@@ -72,19 +110,55 @@ class MSX_Trace(ExecTrace):
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld c, %s" % STR[opcode & 0x07]
 
+    elif opcode & 0xF8 == 0x70: #
+      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "ld (hl), %s" % STR[opcode & 0x07]
+
     elif opcode & 0xF8 == 0x78: # ld a, ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld a, %s" % STR[opcode & 0x07]
+
+    elif opcode & 0xF8 == 0x80: # add a, ??
+      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "add a, %s" % STR[opcode & 0x07]
+
+    elif opcode & 0xF8 == 0xA0: # and ??
+      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "and %s" % STR[opcode & 0x07]
 
     elif opcode & 0xF8 == 0xB0: # or ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "or %s" % STR[opcode & 0x07]
 
+    elif opcode & 0xCF == 0xC1: # pop reg
+      STR = ['bc', 'de', 'hl', 'af']
+      return "pop %s" % STR[(opcode >> 4) & 3]
+
+    elif opcode & 0xCF == 0xC5: # push reg
+      STR = ['bc', 'de', 'hl', 'af']
+      return "push %s" % STR[(opcode >> 4) & 3]
+
+    elif opcode == 0xCB: # BIT INSTRUCTIONS:
+      ext_opcode = self.fetch()
+
+      ext_instructions = {
+        0x11: "rl c",
+      }
+      if ext_opcode in ext_instructions:
+        return ext_instructions[ext_opcode]
+      else:
+        self.illegal_instruction(0xed00 | ext_opcode)
+        return "; DISASM ERROR! Illegal bit instruction (ext_opcode = 0x%02X)" % ext_opcode
+
     elif opcode == 0xcd: # CALL
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
       self.subroutine(addr)
-      return "call 0x%04X" % addr
+      comment = get_subroutine_comment(addr)
+      if comment:
+        return "call %s\t; %s" % (get_label(addr), comment)
+      else:
+        return "call %s" % get_label(addr)
 
     elif opcode == 0xe6: # 
       imm = self.fetch()
@@ -99,8 +173,8 @@ class MSX_Trace(ExecTrace):
       if ext_opcode in ext_instructions:
         return ext_instructions[ext_opcode]
       else:
-        self.illegal_instruction(0xed00 | opcode)
-        return "; DISASM ERROR! Illegal extended instruction (opcode = 0x%02X)" % opcode
+        self.illegal_instruction(0xed00 | ext_opcode)
+        return "; DISASM ERROR! Illegal extended instruction (ext_opcode = 0x%02X)" % ext_opcode
 
     elif opcode == 0xf6:
       value = self.fetch()
@@ -122,8 +196,8 @@ else:
   gamerom = sys.argv[1]
   makedir(OUTPUT_DIR)
   print "disassembling {}...".format(gamerom)
-  trace = MSX_Trace(gamerom, loglevel=0, relocation_address=0x0000)
-  trace.run(entry_point=0x0010)
+  trace = MSX_Trace(gamerom, loglevel=0, relocation_address=0x4000)
+  trace.run(entry_point=0x4017) #GALAGA!
 #  trace.print_ranges()
 #  trace.print_grouped_ranges()
 

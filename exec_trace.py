@@ -198,7 +198,7 @@ class ExecTrace():
     self.visited_ranges.append(block)
 
   def schedule_entry_point(self, address):
-    if self.already_visited(address):
+    if address < self.relocation_address or self.already_visited(address):
       return
 
     if address not in self.pending_entry_points:

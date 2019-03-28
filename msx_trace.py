@@ -9,6 +9,7 @@ romset_dir = None
 KNOWN_VARS = {}
 KNOWN_SUBROUTINES = {
   0x0047: ("WRTVDP", "Writes to the VDP register."),
+  0x005C: ("LIDRVM", "Moves block of memory from memory to VRAM."),
   0x0093: ("WRTPSG", "Writes data to the PSG register."),
   0x0096: ("RDPSG", "Read data from the PSG register."),
   0x0138: ("RSLREG", "Reads the current output to the primary slot register."),
@@ -267,10 +268,16 @@ class MSX_Trace(ExecTrace):
       ix_opcode = self.fetch()
 
       ix_instructions = {
+        0x23: "inc ix",
         0xE1: "pop ix",
       }
       if ix_opcode in ix_instructions:
         return ix_instructions[ix_opcode]
+
+      elif ix_opcode & 0xCF == 0x4E: #
+        STR = ['c', 'e', 'l', 'a']
+        imm = self.fetch()
+        return "ld %s, (ix + %s)" % (STR[(ix_opcode >> 4) & 3], imm)
 
       # FOO-BAR:
       #

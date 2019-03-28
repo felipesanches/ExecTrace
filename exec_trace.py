@@ -101,8 +101,9 @@ class ExecTrace():
     self.add_range(start=self.current_entry_point,
                    end=self.PC-1,
                    exit=[self.PC, address])
-    self.schedule_entry_point(self.PC)
+
     self.schedule_entry_point(address)
+    self.schedule_entry_point(self.PC)
 
     self.log(VERBOSE, "CALL SUBROUTINE ({})".format(hex(address)))
     self.log_status()
@@ -138,9 +139,10 @@ class ExecTrace():
       self.add_range(start=self.current_entry_point,
                      end=self.PC-1,
                      exit=[self.PC, address])
+      self.schedule_entry_point(address)
       if conditional:
         self.schedule_entry_point(self.PC)
-      self.schedule_entry_point(address)
+
 
     self.log_ranges()
     self.restart_from_another_entry_point()

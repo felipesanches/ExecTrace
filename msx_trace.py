@@ -11,6 +11,8 @@ KNOWN_SUBROUTINES = {
   0x0047: ("WRTVDP", "Writes to the VDP register."),
   0x0138: ("RSLREG", "Reads the current output to the primary slot register."),
   0x013B: ("WSLREG", "Writes to the primary slot register."),
+  0x013E: ("RDVDP", "Reads the VPD status register."),
+  0x0141: ("SNSMAT", "Returns the status of a specified row of a keyboard matrix."),
 }
 
 def getVariableName(addr):
@@ -53,6 +55,7 @@ class MSX_Trace(ExecTrace):
       0x17: "rla",
       0x1f: "rra",
       0x2f: "cpl",
+      0xfb: "ei",
     }
 
     if opcode in simple_instructions:
@@ -73,16 +76,41 @@ class MSX_Trace(ExecTrace):
       imm = self.fetch()
       return "ld %s, 0x%02X" % (STR[(opcode >> 4) & 3], imm)
 
+    elif opcode & 0xCF == 0x0C: # inc reg
+      STR = ['c', 'e', 'l', 'a']
+      return "inc %s" % STR[(opcode >> 4) & 3]
+
+    elif opcode & 0xCF == 0x0D: # dec reg
+      STR = ['c', 'e', 'l', 'a']
+      return "dec %s" % STR[(opcode >> 4) & 3]
+
     elif opcode & 0xCF == 0x0E: # ld reg, byte
       STR = ['c', 'e', 'l', 'a']
       imm = self.fetch()
       return "ld %s, 0x%02X" % (STR[(opcode >> 4) & 3], imm)
 
+    elif opcode == 0x10:
+      imm = self.fetch()
+      addr = self.PC + imm - 127
+      self.conditional_branch(addr)
+      return "djnz %s" % get_label(addr)
+
+    elif opcode == 0x18:
+      imm = self.fetch()
+      addr = self.PC + imm - 127
+      self.unconditional_jump(addr)
+      return "jr %s" % get_label(addr)
+
+    elif opcode == 0x22: # 
+      imm = self.fetch()
+      imm = imm | (self.fetch() << 8)
+      return "ld (0x%04X), hl" % imm
+
     elif opcode == 0x28:
       imm = self.fetch()
       addr = self.PC + imm - 127
       self.conditional_branch(addr)
-      return "jr z, 0x%04X" % addr
+      return "jr z, %s" % get_label(addr)
 
     elif opcode == 0x32: # 
       imm = self.fetch()
@@ -110,6 +138,10 @@ class MSX_Trace(ExecTrace):
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld c, %s" % STR[opcode & 0x07]
 
+    elif opcode & 0xF8 == 0x60: #
+      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "ld h, %s" % STR[opcode & 0x07]
+
     elif opcode & 0xF8 == 0x70: #
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld (hl), %s" % STR[opcode & 0x07]
@@ -121,6 +153,10 @@ class MSX_Trace(ExecTrace):
     elif opcode & 0xF8 == 0x80: # add a, ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "add a, %s" % STR[opcode & 0x07]
+
+    elif opcode & 0xF8 == 0x90: # sub ??
+      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "sub %s" % STR[opcode & 0x07]
 
     elif opcode & 0xF8 == 0xA0: # and ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
@@ -138,6 +174,13 @@ class MSX_Trace(ExecTrace):
       STR = ['bc', 'de', 'hl', 'af']
       return "push %s" % STR[(opcode >> 4) & 3]
 
+    elif opcode & 0xCF == 0xCA: # jp cond, **
+      STR = ['z', 'c', 'pe', 'm']
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      self.conditional_branch(addr)
+      return "jp %s, %s" % (STR[(opcode >> 4) & 3], get_label(addr))
+
     elif opcode == 0xCB: # BIT INSTRUCTIONS:
       ext_opcode = self.fetch()
 
@@ -149,6 +192,10 @@ class MSX_Trace(ExecTrace):
       else:
         self.illegal_instruction(0xed00 | ext_opcode)
         return "; DISASM ERROR! Illegal bit instruction (ext_opcode = 0x%02X)" % ext_opcode
+
+    elif opcode == 0xc9:
+      self.return_from_subroutine()
+      return "ret"
 
     elif opcode == 0xcd: # CALL
       addr = self.fetch()
@@ -175,6 +222,10 @@ class MSX_Trace(ExecTrace):
       else:
         self.illegal_instruction(0xed00 | ext_opcode)
         return "; DISASM ERROR! Illegal extended instruction (ext_opcode = 0x%02X)" % ext_opcode
+
+    elif opcode == 0xee:
+      value = self.fetch()
+      return "xor 0x%02X" % value
 
     elif opcode == 0xf6:
       value = self.fetch()

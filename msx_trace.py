@@ -55,32 +55,38 @@ class MSX_Trace(ExecTrace):
       0x17: "rla",
       0x1f: "rra",
       0x2f: "cpl",
+      0xeb: "ex de, hl",
+      0xf9: "ld sp, hl", # TODO: This may be used to change exec flow by changing the ret address in the stack
       0xfb: "ei",
     }
 
     if opcode in simple_instructions:
       return simple_instructions[opcode]
 
-    elif opcode & 0xCF == 0x01: # ld ??, word
+    elif opcode & 0xCF == 0x01: # ld reg16, word
       STR = ['bc', 'de', 'hl', 'sp']
       imm = self.fetch()
       imm = imm | (self.fetch() << 8)
       return "ld %s, 0x%04X" % (STR[(opcode >> 4) & 3], imm)
 
-    elif opcode & 0xCF == 0x03: # inc reg
+    elif opcode & 0xCF == 0x03: # inc reg16
       STR = ['bc', 'de', 'hl', 'sp']
       return "inc %s" % STR[(opcode >> 4) & 3]
 
-    elif opcode & 0xCF == 0x06: # ld ??, byte
+    elif opcode & 0xCF == 0x06: # ld _8, byte
       STR = ['b', 'd', 'hl', '(hl)']
       imm = self.fetch()
       return "ld %s, 0x%02X" % (STR[(opcode >> 4) & 3], imm)
 
-    elif opcode & 0xCF == 0x0C: # inc reg
+    elif opcode & 0xCF == 0x09: # add hl, reg16 
+      STR = ['bc', 'de', 'hl', 'sp']
+      return "add hl, %s" % STR[(opcode >> 4) & 3]
+
+    elif opcode & 0xCF == 0x0C: # inc reg8
       STR = ['c', 'e', 'l', 'a']
       return "inc %s" % STR[(opcode >> 4) & 3]
 
-    elif opcode & 0xCF == 0x0D: # dec reg
+    elif opcode & 0xCF == 0x0D: # dec reg8
       STR = ['c', 'e', 'l', 'a']
       return "dec %s" % STR[(opcode >> 4) & 3]
 
@@ -181,6 +187,12 @@ class MSX_Trace(ExecTrace):
       self.conditional_branch(addr)
       return "jp %s, %s" % (STR[(opcode >> 4) & 3], get_label(addr))
 
+    elif opcode == 0xc3: # jump addr
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      self.unconditional_jump(addr)
+      return "jp %s" % get_label(addr)
+
     elif opcode == 0xCB: # BIT INSTRUCTIONS:
       ext_opcode = self.fetch()
 
@@ -196,6 +208,18 @@ class MSX_Trace(ExecTrace):
     elif opcode == 0xc9:
       self.return_from_subroutine()
       return "ret"
+
+    elif opcode == 0xcc: # conditional CALL
+      STR = ['z', 'c', 'pe', 'm']
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      self.subroutine(addr)
+      comment = get_subroutine_comment(addr)
+      cond = STR[(opcode >> 4) & 3]
+      if comment:
+        return "call %s, %s\t; %s" % (cond, get_label(addr), comment)
+      else:
+        return "call %s, %s" % (cond, get_label(addr))
 
     elif opcode == 0xcd: # CALL
       addr = self.fetch()

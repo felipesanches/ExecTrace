@@ -31,21 +31,53 @@ class MSX_Trace(ExecTrace):
       #0x03: "inc bc",
       #0x04: "inc b",
       0x07: "rlca",
-      0x17: "rla"
+      0x17: "rla",
     }
 
     if opcode in simple_instructions:
       return simple_instructions[opcode]
 
-    elif opcode & 0xCF == 0x01: # ld ??, **
+    elif opcode & 0xCF == 0x01: # ld ??, word
       STR = ['bc', 'de', 'hl', 'sp']
       immediate = self.fetch()
       immediate = immediate | (self.fetch() << 8)
       return "ld %s, 0x%04X" % (STR[(opcode >> 4) & 3], immediate)
 
-    elif opcode & 0xF0 == 0x40: # ld b, x
+    elif opcode & 0xCF == 0x06: # ld ??, byte
+      STR = ['b', 'd', 'hl', '(hl)']
+      immediate = self.fetch()
+      return "ld %s, 0x%02X" % (STR[(opcode >> 4) & 3], immediate)
+
+    elif opcode== 0x32: # 
+      imm = self.fetch()
+      imm = imm | (self.fetch() << 8)
+      return "ld (0x%04X), a" % imm
+
+    elif opcode & 0xF0 == 0x40: # ld b, ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "ld b, {}".format(STR[opcode & 0x07])
+      return "ld b, %s" % STR[opcode & 0x07]
+
+    elif opcode & 0xF0 == 0xB0: # or ??
+      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "or %s" % STR[opcode & 0x07]
+
+    elif opcode== 0xcd: # CALL
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      self.subroutine(addr)
+      return "call 0x%04X" % addr
+
+    elif opcode== 0xed: # EXTENDED INSTRUCTIONS:
+      ext_opcode = self.fetch()
+
+      ext_instructions = {
+        0xb0: "ldir",
+      }
+      if ext_opcode in ext_instructions:
+        return ext_instructions[ext_opcode]
+      else:
+        self.illegal_instruction(0xed00 | opcode)
+        return "; DISASM ERROR! Illegal extended instruction (opcode = 0x%02X)" % opcode
 
     else:
       self.illegal_instruction(opcode)

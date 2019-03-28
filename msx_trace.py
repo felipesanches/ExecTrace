@@ -130,10 +130,22 @@ class MSX_Trace(ExecTrace):
       self.conditional_branch(addr)
       return "jr z, %s" % get_label(addr)
 
+    elif opcode == 0x30:
+      imm = self.fetch()
+      addr = self.PC - 2 + imm - 128
+      self.conditional_branch(addr)
+      return "jr nc, %s" % get_label(addr)
+
     elif opcode == 0x32: # 
       imm = self.fetch()
       imm = imm | (self.fetch() << 8)
       return "ld (0x%04X), a" % imm
+
+    elif opcode == 0x38:
+      imm = self.fetch()
+      addr = self.PC - 2 + imm - 128
+      self.conditional_branch(addr)
+      return "jr c, %s" % get_label(addr)
 
     elif opcode == 0x3e: # 
       imm = self.fetch()
@@ -170,6 +182,14 @@ class MSX_Trace(ExecTrace):
     elif opcode & 0xCF == 0xC5: # push reg
       STR = ['bc', 'de', 'hl', 'af']
       return "push %s" % STR[(opcode >> 4) & 3]
+
+    elif opcode & 0xCF == 0xC6: # 
+      STR = ['add a,', 'sub', 'and', 'or']
+      imm = self.fetch()
+      return "%s 0x%02X" % (STR[(opcode >> 4) & 3], imm)
+
+    elif opcode & 0xC7 == 0xC7: # rst
+      return "rst 0x%02X" % (((opcode >> 3) & 7) * 0x08)
 
     elif opcode & 0xCF == 0xCA: # jp cond, **
       STR = ['z', 'c', 'pe', 'm']
@@ -240,6 +260,31 @@ class MSX_Trace(ExecTrace):
       else:
         return "call %s" % get_label(addr)
 
+
+
+
+    elif opcode == 0xDD: # IX INSTRUCTIONS:
+      ix_opcode = self.fetch()
+
+      ix_instructions = {
+        0xE1: "pop ix",
+      }
+      if ix_opcode in ix_instructions:
+        return ix_instructions[ix_opcode]
+
+      # FOO-BAR:
+      #
+      #elif ix_opcode & 0xC0 == 0x00: # bit rotates and shifts
+      #  STR1 = ['rlc', 'rrc', 'rl', 'rr', 'sla', 'sra', 'sll', 'srl']
+      #  STR2 = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      #  return "%s %s" % (STR1[(ix_opcode >> 3) & 0x07], STR2[ix_opcode & 0x07])
+
+      else:
+        self.illegal_instruction((opcode << 8) | ix_opcode)
+        return "; DISASM ERROR! Illegal IX instruction (ix_opcode = 0x%02X)" % ix_opcode
+
+
+
     elif opcode == 0xe6: # 
       imm = self.fetch()
       return "and 0x%02X" % imm
@@ -271,6 +316,10 @@ class MSX_Trace(ExecTrace):
     elif opcode == 0xf6:
       value = self.fetch()
       return "or 0x%02X" % value
+
+    elif opcode == 0xfe:
+      value = self.fetch()
+      return "cp 0x%02X" % value
 
     else:
       self.illegal_instruction(opcode)

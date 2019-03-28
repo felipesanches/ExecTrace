@@ -48,26 +48,49 @@ class MSX_Trace(ExecTrace):
       immediate = self.fetch()
       return "ld %s, 0x%02X" % (STR[(opcode >> 4) & 3], immediate)
 
-    elif opcode== 0x32: # 
+    elif opcode == 0x28:
+      imm = self.fetch()
+      addr = self.PC + imm - 127
+      self.conditional_branch(addr)
+      return "jr z, 0x%04X" % addr
+
+    elif opcode == 0x32: # 
       imm = self.fetch()
       imm = imm | (self.fetch() << 8)
       return "ld (0x%04X), a" % imm
 
-    elif opcode & 0xF0 == 0x40: # ld b, ??
+    elif opcode == 0x3a: # 
+      imm = self.fetch()
+      imm = imm | (self.fetch() << 8)
+      return "ld a, (0x%04X)" % imm
+
+    elif opcode & 0xF8 == 0x40: # ld b, ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld b, %s" % STR[opcode & 0x07]
 
-    elif opcode & 0xF0 == 0xB0: # or ??
+    elif opcode & 0xF8 == 0x48: # ld b, ??
+      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "ld c, %s" % STR[opcode & 0x07]
+
+    elif opcode & 0xF8 == 0x78: # ld a, ??
+      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "ld a, %s" % STR[opcode & 0x07]
+
+    elif opcode & 0xF8 == 0xB0: # or ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "or %s" % STR[opcode & 0x07]
 
-    elif opcode== 0xcd: # CALL
+    elif opcode == 0xcd: # CALL
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
       self.subroutine(addr)
       return "call 0x%04X" % addr
 
-    elif opcode== 0xed: # EXTENDED INSTRUCTIONS:
+    elif opcode == 0xe6: # 
+      imm = self.fetch()
+      return "and 0x%02X" % imm
+
+    elif opcode == 0xed: # EXTENDED INSTRUCTIONS:
       ext_opcode = self.fetch()
 
       ext_instructions = {
@@ -78,6 +101,10 @@ class MSX_Trace(ExecTrace):
       else:
         self.illegal_instruction(0xed00 | opcode)
         return "; DISASM ERROR! Illegal extended instruction (opcode = 0x%02X)" % opcode
+
+    elif opcode == 0xf6:
+      value = self.fetch()
+      return "or 0x%02X" % value
 
     else:
       self.illegal_instruction(opcode)

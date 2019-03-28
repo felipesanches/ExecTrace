@@ -82,6 +82,7 @@ class MSX_Trace(ExecTrace):
       0x17: "rla",
       0x1a: "ld a, (de)",
       0x1f: "rra",
+      0x27: "daa",
       0x2f: "cpl",
       0xd9: "exx",
       0xeb: "ex de, hl",
@@ -305,6 +306,7 @@ class MSX_Trace(ExecTrace):
       i_instructions = {
         0x23: "inc %s",
         0xE1: "pop %s",
+        0xE5: "push %s",
       }
       if i_opcode in i_instructions:
         return i_instructions[i_opcode] % ireg

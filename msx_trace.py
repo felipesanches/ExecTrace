@@ -75,6 +75,10 @@ class MSX_Trace(ExecTrace):
       STR = ['bc', 'de', 'hl', 'sp']
       return "inc %s" % STR[(opcode >> 4) & 3]
 
+    elif opcode & 0xCF == 0x04: # inc reg8
+      STR = ['b', 'd', 'h', '(hl)']
+      return "inc %s" % STR[(opcode >> 4) & 3]
+
     elif opcode & 0xCF == 0x06: # ld _8, byte
       STR = ['b', 'd', 'hl', '(hl)']
       imm = self.fetch()
@@ -142,15 +146,19 @@ class MSX_Trace(ExecTrace):
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld b, %s" % STR[opcode & 0x07]
 
-    elif opcode & 0xF8 == 0x48: # ld b, ??
+    elif opcode & 0xF8 == 0x48: # ld c, ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld c, %s" % STR[opcode & 0x07]
 
-    elif opcode & 0xF8 == 0x60: #
+    elif opcode & 0xF8 == 0x60: # ld h, ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld h, %s" % STR[opcode & 0x07]
 
-    elif opcode & 0xF8 == 0x70: #
+    elif opcode & 0xF8 == 0x68: # ld l, ??
+      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "ld l, %s" % STR[opcode & 0x07]
+
+    elif opcode & 0xF8 == 0x70: # ld (hl), ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld (hl), %s" % STR[opcode & 0x07]
 

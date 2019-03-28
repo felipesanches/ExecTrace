@@ -60,6 +60,7 @@ class MSX_Trace(ExecTrace):
       0x0f: "rrca",
       0x12: "ld (de), a",
       0x17: "rla",
+      0x1a: "ld a, (de)",
       0x1f: "rra",
       0x2f: "cpl",
       0xd9: "exx",
@@ -180,11 +181,11 @@ class MSX_Trace(ExecTrace):
       STR2 = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "%s %s" % (STR1[(opcode >> 3) & 0x07], STR2[opcode & 0x07])
 
-    elif opcode & 0xCF == 0xC0: # conditional ret
-      STR = ['nz', 'nc', 'po', 'p'] 
+    elif opcode & 0xC7 == 0xC0: # conditional ret
+      STR = ['nz', 'z', 'nc', 'c', 'po', 'pe', 'p', 'm'] 
       self.return_from_subroutine() # TODO: review this.
       self.schedule_entry_point(self.PC)
-      return "ret %s" % STR[(opcode >> 4) & 3]
+      return "ret %s" % STR[(opcode >> 3) & 7]
 
     elif opcode & 0xCF == 0xC1: # pop reg
       STR = ['bc', 'de', 'hl', 'af']

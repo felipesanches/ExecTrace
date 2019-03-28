@@ -275,31 +275,33 @@ class MSX_Trace(ExecTrace):
 
 
 
-    elif opcode == 0xDD: # IX INSTRUCTIONS:
-      ix_opcode = self.fetch()
+    elif opcode in [0xDD, 0xFD]: # IX/IY INSTRUCTIONS:
+      i_opcode = self.fetch()
+      if opcode == 0xDD:
+        ireg = "ix"
+      else:
+        ireg = "iy"
 
-      ix_instructions = {
-        0x23: "inc ix",
-        0xE1: "pop ix",
+      i_instructions = {
+        0x23: "inc %s",
+        0xE1: "pop %s",
       }
-      if ix_opcode in ix_instructions:
-        return ix_instructions[ix_opcode]
+      if i_opcode in i_instructions:
+        return i_instructions[i_opcode] % ireg
 
-      elif ix_opcode & 0xCF == 0x4E: #
+      elif i_opcode == 0x21: #
+        imm = self.fetch()
+        imm = imm | (self.fetch() << 8)
+        return "ld %s, 0x%04X" % (ireg, imm)
+
+      elif i_opcode & 0xCF == 0x4E: #
         STR = ['c', 'e', 'l', 'a']
         imm = self.fetch()
-        return "ld %s, (ix + %s)" % (STR[(ix_opcode >> 4) & 3], imm)
-
-      # FOO-BAR:
-      #
-      #elif ix_opcode & 0xC0 == 0x00: # bit rotates and shifts
-      #  STR1 = ['rlc', 'rrc', 'rl', 'rr', 'sla', 'sra', 'sll', 'srl']
-      #  STR2 = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      #  return "%s %s" % (STR1[(ix_opcode >> 3) & 0x07], STR2[ix_opcode & 0x07])
+        return "ld %s, (%s + %s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
 
       else:
-        self.illegal_instruction((opcode << 8) | ix_opcode)
-        return "; DISASM ERROR! Illegal IX instruction (ix_opcode = 0x%02X)" % ix_opcode
+        self.illegal_instruction((opcode << 8) | i_opcode)
+        return "; DISASM ERROR! Illegal %s instruction (%s_opcode = 0x%02X)" % (ireg, ireg, i_opcode)
 
 
 

@@ -130,19 +130,19 @@ class MSX_Trace(ExecTrace):
 
     elif opcode == 0x10:
       imm = self.fetch()
-      addr = self.PC - 2 + twos_compl(imm)
+      addr = self.PC + twos_compl(imm)
       self.conditional_branch(addr)
       return "djnz %s" % get_label(addr)
 
     elif opcode == 0x18:
       imm = self.fetch()
-      addr = self.PC - 2 + twos_compl(imm)
+      addr = self.PC + twos_compl(imm)
       self.unconditional_jump(addr)
       return "jr %s" % get_label(addr)
 
     elif opcode == 0x20:
       imm = self.fetch()
-      addr = self.PC - 2 + twos_compl(imm)
+      addr = self.PC + twos_compl(imm)
       self.conditional_branch(addr)
       return "jr nz, %s" % get_label(addr)
 
@@ -153,7 +153,7 @@ class MSX_Trace(ExecTrace):
 
     elif opcode == 0x28:
       imm = self.fetch()
-      addr = self.PC - 2 + twos_compl(imm)
+      addr = self.PC + twos_compl(imm)
       self.conditional_branch(addr)
       return "jr z, %s" % get_label(addr)
 
@@ -164,7 +164,7 @@ class MSX_Trace(ExecTrace):
 
     elif opcode == 0x30:
       imm = self.fetch()
-      addr = self.PC - 2 + twos_compl(imm)
+      addr = self.PC + twos_compl(imm)
       self.conditional_branch(addr)
       return "jr nc, %s" % get_label(addr)
 
@@ -175,7 +175,7 @@ class MSX_Trace(ExecTrace):
 
     elif opcode == 0x38:
       imm = self.fetch()
-      addr = self.PC - 2 + twos_compl(imm)
+      addr = self.PC + twos_compl(imm)
       self.conditional_branch(addr)
       return "jr c, %s" % get_label(addr)
 

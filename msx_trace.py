@@ -9,6 +9,8 @@ romset_dir = None
 KNOWN_VARS = {}
 KNOWN_SUBROUTINES = {
   0x0047: ("WRTVDP", "Writes to the VDP register."),
+  0x0093: ("WRTPSG", "Writes data to the PSG register."),
+  0x0096: ("RDPSG", "Read data from the PSG register."),
   0x0138: ("RSLREG", "Reads the current output to the primary slot register."),
   0x013B: ("WSLREG", "Writes to the primary slot register."),
   0x013E: ("RDVDP", "Reads the VPD status register."),
@@ -97,13 +99,13 @@ class MSX_Trace(ExecTrace):
 
     elif opcode == 0x10:
       imm = self.fetch()
-      addr = self.PC + imm - 127
+      addr = self.PC - 2 + imm - 128
       self.conditional_branch(addr)
       return "djnz %s" % get_label(addr)
 
     elif opcode == 0x18:
       imm = self.fetch()
-      addr = self.PC + imm - 127
+      addr = self.PC - 2 + imm - 128
       self.unconditional_jump(addr)
       return "jr %s" % get_label(addr)
 
@@ -114,7 +116,7 @@ class MSX_Trace(ExecTrace):
 
     elif opcode == 0x28:
       imm = self.fetch()
-      addr = self.PC + imm - 127
+      addr = self.PC - 2 + imm - 128
       self.conditional_branch(addr)
       return "jr z, %s" % get_label(addr)
 
@@ -171,6 +173,12 @@ class MSX_Trace(ExecTrace):
     elif opcode & 0xF8 == 0xB0: # or ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "or %s" % STR[opcode & 0x07]
+
+    elif opcode & 0xCF == 0xC0: # conditional ret
+      STR = ['nz', 'nc', 'po', 'p'] 
+      self.return_from_subroutine() # TODO: review this.
+      self.schedule_entry_point(self.PC)
+      return "ret %s" % STR[(opcode >> 4) & 3]
 
     elif opcode & 0xCF == 0xC1: # pop reg
       STR = ['bc', 'de', 'hl', 'af']

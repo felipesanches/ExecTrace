@@ -195,11 +195,21 @@ class MSX_Trace(ExecTrace):
       self.conditional_branch(addr)
       return "jp %s, %s" % (STR[(opcode >> 4) & 3], get_label(addr))
 
-    elif opcode == 0xc3: # jump addr
+    elif opcode == 0xC3: # jump addr
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
       self.unconditional_jump(addr)
       return "jp %s" % get_label(addr)
+
+    elif opcode == 0xC6:
+      value = self.fetch()
+      return "add a, 0x%02X" % value
+
+    elif opcode == 0xC9: # RET
+      self.return_from_subroutine()
+      return "ret"
+
+
 
     elif opcode == 0xCB: # BIT INSTRUCTIONS:
       ext_opcode = self.fetch()
@@ -209,15 +219,18 @@ class MSX_Trace(ExecTrace):
       }
       if ext_opcode in ext_instructions:
         return ext_instructions[ext_opcode]
+
+      elif ext_opcode & 0xC0 == 0x40: # bit n, ??
+        STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+        n = (ext_opcode >> 3) & 7
+        return "bit %d, %s" % (n, STR[ext_opcode & 0x07])
+
       else:
-        self.illegal_instruction(0xed00 | ext_opcode)
+        self.illegal_instruction((opcode << 8) | ext_opcode)
         return "; DISASM ERROR! Illegal bit instruction (ext_opcode = 0x%02X)" % ext_opcode
 
-    elif opcode == 0xc9:
-      self.return_from_subroutine()
-      return "ret"
 
-    elif opcode == 0xcc: # conditional CALL
+    elif opcode == 0xCC: # conditional CALL
       STR = ['z', 'c', 'pe', 'm']
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
@@ -252,7 +265,7 @@ class MSX_Trace(ExecTrace):
       if ext_opcode in ext_instructions:
         return ext_instructions[ext_opcode]
       else:
-        self.illegal_instruction(0xed00 | ext_opcode)
+        self.illegal_instruction((opcode << 8) | ext_opcode)
         return "; DISASM ERROR! Illegal extended instruction (ext_opcode = 0x%02X)" % ext_opcode
 
     elif opcode == 0xee:

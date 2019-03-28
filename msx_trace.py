@@ -146,21 +146,10 @@ class MSX_Trace(ExecTrace):
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
       return "ld %s, %s" % (STR[(opcode >> 3) & 0x07], STR[opcode & 0x07])
 
-    elif opcode & 0xF8 == 0x80: # add a, ??
-      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "add a, %s" % STR[opcode & 0x07]
-
-    elif opcode & 0xF8 == 0x90: # sub ??
-      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "sub %s" % STR[opcode & 0x07]
-
-    elif opcode & 0xF8 == 0xA0: # and ??
-      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "and %s" % STR[opcode & 0x07]
-
-    elif opcode & 0xF8 == 0xB0: # or ??
-      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "or %s" % STR[opcode & 0x07]
+    elif opcode & 0xC0 == 0x80:
+      STR1 = ['add a,', 'adc a,', 'sub', 'sbc a,', 'and', 'xor', 'or', 'cp']
+      STR2 = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+      return "%s %s" % (STR1[(opcode >> 3) & 0x07], STR2[opcode & 0x07])
 
     elif opcode & 0xCF == 0xC0: # conditional ret
       STR = ['nz', 'nc', 'po', 'p'] 

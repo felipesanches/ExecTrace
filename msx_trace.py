@@ -142,29 +142,9 @@ class MSX_Trace(ExecTrace):
       self.return_from_subroutine()
       return "halt"
 
-    elif opcode & 0xF8 == 0x40: # ld b, ??
+    elif opcode & 0xC0 == 0x40: # ld ??, ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "ld b, %s" % STR[opcode & 0x07]
-
-    elif opcode & 0xF8 == 0x48: # ld c, ??
-      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "ld c, %s" % STR[opcode & 0x07]
-
-    elif opcode & 0xF8 == 0x60: # ld h, ??
-      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "ld h, %s" % STR[opcode & 0x07]
-
-    elif opcode & 0xF8 == 0x68: # ld l, ??
-      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "ld l, %s" % STR[opcode & 0x07]
-
-    elif opcode & 0xF8 == 0x70: # ld (hl), ??
-      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "ld (hl), %s" % STR[opcode & 0x07]
-
-    elif opcode & 0xF8 == 0x78: # ld a, ??
-      STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
-      return "ld a, %s" % STR[opcode & 0x07]
+      return "ld %s, %s" % (STR[(opcode >> 3) & 0x07], STR[opcode & 0x07])
 
     elif opcode & 0xF8 == 0x80: # add a, ??
       STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']

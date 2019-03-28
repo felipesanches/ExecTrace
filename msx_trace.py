@@ -55,9 +55,6 @@ class MSX_Trace(ExecTrace):
 
     simple_instructions = {
       0x00: "nop",
-      #0x02: "ld (bc), a",
-      #0x03: "inc bc",
-      #0x04: "inc b",
       0x07: "rlca",
       0x08: "ex af, af'",
       0x0f: "rrca",
@@ -65,6 +62,7 @@ class MSX_Trace(ExecTrace):
       0x17: "rla",
       0x1f: "rra",
       0x2f: "cpl",
+      0xd9: "exx",
       0xeb: "ex de, hl",
       0xf9: "ld sp, hl", # TODO: This may be used to change exec flow by changing the ret address in the stack
       0xfb: "ei",
@@ -128,15 +126,20 @@ class MSX_Trace(ExecTrace):
       return "jr nz, %s" % get_label(addr)
 
     elif opcode == 0x22: # 
-      imm = self.fetch()
-      imm = imm | (self.fetch() << 8)
-      return "ld (0x%04X), hl" % imm
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      return "ld (%s), hl" % getVariableName(addr)
 
     elif opcode == 0x28:
       imm = self.fetch()
       addr = self.PC - 2 + twos_compl(imm)
       self.conditional_branch(addr)
       return "jr z, %s" % get_label(addr)
+
+    elif opcode == 0x2A:
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      return "ld hl, (%s)" % getVariableName(addr)
 
     elif opcode == 0x30:
       imm = self.fetch()
@@ -145,9 +148,9 @@ class MSX_Trace(ExecTrace):
       return "jr nc, %s" % get_label(addr)
 
     elif opcode == 0x32: # 
-      imm = self.fetch()
-      imm = imm | (self.fetch() << 8)
-      return "ld (0x%04X), a" % imm
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      return "ld (%s), a" % getVariableName(addr)
 
     elif opcode == 0x38:
       imm = self.fetch()
@@ -160,9 +163,9 @@ class MSX_Trace(ExecTrace):
       return "ld a, 0x%02X" % imm
 
     elif opcode == 0x3a: # 
-      imm = self.fetch()
-      imm = imm | (self.fetch() << 8)
-      return "ld a, (0x%04X)" % imm
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      return "ld a, (%s)" % getVariableName(addr)
 
     elif opcode == 0x76:
       self.return_from_subroutine()

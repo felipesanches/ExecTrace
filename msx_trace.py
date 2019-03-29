@@ -319,7 +319,12 @@ class MSX_Trace(ExecTrace):
       elif i_opcode & 0xCF == 0x4E: #
         STR = ['c', 'e', 'l', 'a']
         imm = self.fetch()
-        return "ld %s, (%s + #%s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
+        return "ld %s, (%s + %s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
+
+      elif i_opcode in [0x46, 0x56, 0x66]: #
+        STR = ['b', 'd', 'h']
+        imm = self.fetch()
+        return "ld %s, (%s + %s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
 
       else:
         self.illegal_instruction((opcode << 8) | i_opcode)

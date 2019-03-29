@@ -9,9 +9,6 @@ import sys
 
 from exec_trace import ExecTrace, hex8, hex16
 
-OUTPUT_DIR = "output"
-romset_dir = None
-
 KNOWN_VARS = {}
 KNOWN_SUBROUTINES = {
   0x0047: ("WRTVDP", "Writes to the VDP register."),
@@ -398,11 +395,10 @@ if len(sys.argv) != 2:
   print("usage: {} <filename.rom>".format(sys.argv[0]))
 else:
   gamerom = sys.argv[1]
-  makedir(OUTPUT_DIR)
   print "disassembling {}...".format(gamerom)
 
-# Galaga has got a jump table stored at address 0x95FD (rom offset 0x55FD)
-# There seem to be 13 entries in that table:
+  # Galaga has got a jump table stored at address 0x95FD (ROM offset 0x55FD)
+  # There seem to be 13 entries in that table:
   galaga_jumps = [
     0x9633,
     0x9680,
@@ -428,7 +424,7 @@ else:
   for codeblock in sorted(trace.visited_ranges, key=lambda cb: cb.start):
     print(hex16(codeblock.start), hex16(codeblock.end))
 
-  print("Jump tables: ")
+  print('"JP (HL)" instructions found at:\n')
   for t in jump_tables:
     print("\t0x%04X" % t)
 

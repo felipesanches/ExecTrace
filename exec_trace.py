@@ -1,5 +1,18 @@
 #!/usr/bin/env python
+# (c) 2019 Felipe Correa da Silva Sanches <juca@members.fsf.org>
+# Released under the terms of the GNU GPL version 3 or later.
+#
 import sys
+
+def hex8(v):
+  return "0x%02X" % v
+
+def hex16(v):
+  return "0x%04X" % v
+
+ERROR = 0   # only critical messages
+VERBOSE = 1 # informative non-error msgs to the user
+DEBUG = 2   # debugging messages to the developer
 
 class CodeBlock():
   ''' A code block represents an address range in
@@ -24,15 +37,6 @@ class CodeBlock():
   def add_subroutine_call(self, instr_address, routine_address):
     self.subroutines[instr_address] = routine_address
 
-def hex8(v):
-  return "0x%02X" % v
-
-def hex16(v):
-  return "0x%04X" % v
-
-ERROR = 0   # only critical messages
-VERBOSE = 1 # informative non-error msgs to the user
-DEBUG = 2   # debugging messages to the developer
 
 class ExecTrace():
   """ ExecTrace is a generic class that implements an

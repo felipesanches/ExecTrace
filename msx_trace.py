@@ -384,10 +384,34 @@ else:
   gamerom = sys.argv[1]
   makedir(OUTPUT_DIR)
   print "disassembling {}...".format(gamerom)
-  trace = MSX_Trace(gamerom, loglevel=0, relocation_address=0x4000)
+
+# Galaga has got a jump table stored at address 0x95FD (rom offset 0x55FD)
+# There seem to be 13 entries in that table:
+  galaga_jumps = [
+    0x9633,
+    0x9680,
+    0x96b7,
+    0x96c3,
+    0x96f0,
+    0x96d9,
+    0x9732,  
+    0x9746,  
+    0x975e,  
+    0x9765,  
+    0x9775,  
+    0x9784,  
+    0x9706
+  ]
+  trace = MSX_Trace(gamerom,
+                    loglevel=0,
+                    relocation_address=0x4000,
+                    jump_table=galaga_jumps)
   trace.run(entry_point=0x4017) #GALAGA!
-#  trace.print_ranges()
-#  trace.print_grouped_ranges()
+  #trace.print_grouped_ranges()
+
+  for codeblock in sorted(trace.visited_ranges, key=lambda cb: cb.start):
+    print(hex16(codeblock.start), hex16(codeblock.end))
+
   print("Jump tables: ")
   for t in jump_tables:
     print("\t0x%04X" % t)

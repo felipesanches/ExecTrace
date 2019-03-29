@@ -78,14 +78,19 @@ class ExecTrace():
            with operation code <opcode> could not
            be parsed as a valid known instruction.
   """
-  def __init__(self, romfile, rombank=0, loglevel=ERROR, relocation_address=0x0000):
+  def __init__(self,
+               romfile,
+               rombank=0,
+               loglevel=ERROR,
+               relocation_address=0x0000,
+               jump_table=[]):
     self.loglevel = loglevel
     self.rombank = rombank
     self.relocation_address = relocation_address
     self.rom = [chr(0x00)] * relocation_address
     self.rom += open(romfile).read()
     self.visited_ranges = []
-    self.pending_entry_points = []
+    self.pending_entry_points = jump_table
     self.current_entry_point = None
     self.PC = None
     self.disasm = {}

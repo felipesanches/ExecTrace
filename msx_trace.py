@@ -358,6 +358,11 @@ class MSX_Trace(ExecTrace):
         addr = addr | (self.fetch() << 8)
         return "ld (%s), sp" % getVariableName(addr)
 
+      elif ext_opcode == 0x7B:
+        addr = self.fetch()
+        addr = addr | (self.fetch() << 8)
+        return "ld sp, (%s)" % getVariableName(addr)
+
       else:
         self.illegal_instruction((opcode << 8) | ext_opcode)
         return "; DISASM ERROR! Illegal extended instruction (ext_opcode = %s)" % hex8(ext_opcode)

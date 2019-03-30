@@ -289,7 +289,16 @@ class ExecTrace():
 
     asm.write("\torg %s\n" % hex16(self.relocation_address))
     next_addr = self.relocation_address
-    for codeblock in sorted(self.visited_ranges, key=lambda cb: cb.start):
+
+    ranges = sorted(self.visited_ranges, key=lambda cb: cb.start)
+
+    # This is a hack to make the disasm output the final
+    # block of data in the end of a ROM image:
+    ranges.append(CodeBlock(start=self.relocation_address+len(self.rom),
+                            end=-1,
+                            next_block=[]))
+
+    for codeblock in ranges:
       if codeblock.start < next_addr:
         # Skip repeated blocks!
         # something wrong happened here

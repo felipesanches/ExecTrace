@@ -105,7 +105,7 @@ class MSX_Trace(ExecTrace):
       return "inc %s" % STR[(opcode >> 4) & 3]
 
     elif opcode & 0xCF == 0x06: # ld _8, byte
-      STR = ['b', 'd', 'hl', '(hl)']
+      STR = ['b', 'd', 'h', '(hl)']
       imm = self.fetch()
       return "ld %s, %s" % (STR[(opcode >> 4) & 3], hex8(imm))
 

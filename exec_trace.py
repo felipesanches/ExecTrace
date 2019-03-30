@@ -113,9 +113,10 @@ class ExecTrace():
       except AddressAlreadyVisited:
         self.log(VERBOSE, "ALREADY BEEN AT {}!".format(hex(self.PC)))
         self.log(DEBUG, "pending_entry_points: {}".format(self.pending_entry_points))
-        self.add_range(start=self.current_entry_point,
-                       end=self.PC-1,
-                       exit=[self.PC])
+        if self.PC > self.current_entry_point:
+          self.add_range(start=self.current_entry_point,
+                         end=self.PC-1,
+                         exit=[self.PC])
         self.restart_from_another_entry_point()
 
 ### Methods for declaring the behaviour of branching instructions ###

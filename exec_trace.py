@@ -37,6 +37,8 @@ class CodeBlock():
   def add_subroutine_call(self, instr_address, routine_address):
     self.subroutines[instr_address] = routine_address
 
+class AddressAlreadyVisited(Exception):
+  pass
 
 class ExecTrace():
   """ ExecTrace is a generic class that implements an
@@ -105,10 +107,17 @@ class ExecTrace():
     self.PC = entry_point
     while self.PC is not None:
       address = self.PC
-      opcode = self.fetch()
-      if opcode != -1:
+      try:
+        opcode = self.fetch()
         self.disasm[address] = self.disasm_instruction(opcode)
         print("%04X: %s" % (address, self.disasm[address]))
+      except AddressAlreadyVisited:
+        self.log(VERBOSE, "ALREADY BEEN AT {}!".format(hex(self.PC)))
+        self.log(DEBUG, "pending_entry_points: {}".format(self.pending_entry_points))
+        self.add_range(start=self.current_entry_point,
+                       end=self.PC-1,
+                       exit=[self.PC])
+        self.restart_from_another_entry_point()
 
 ### Methods for declaring the behaviour of branching instructions ###
   def subroutine(self, address):
@@ -222,23 +231,13 @@ class ExecTrace():
       self.log(VERBOSE, "SCHEDULING: {}".format(hex(address)))
       self.log_status()
 
-  def increment_PC(self):
-    if self.already_visited(self.PC):
-      self.log(VERBOSE, "ALREADY BEEN AT {}!".format(hex(self.PC)))
-      self.log(DEBUG, "pending_entry_points: {}".format(self.pending_entry_points))
-      self.add_range(start=self.current_entry_point,
-                     end=self.PC-1,
-                     exit=[self.PC])
-      self.restart_from_another_entry_point()
-      return -1
-    else:
-      self.PC += 1
-
   def fetch(self):
     value = ord(self.rom[self.rombank + self.PC])
     self.log(DEBUG, "Fetch at {}: {}".format(hex(self.PC), hex(value)))
-    if self.increment_PC() == -1:
-      return -1
+    if self.already_visited(self.PC):
+      raise AddressAlreadyVisited
+    else:
+      self.PC += 1
     return value
 
 ####### LOGGING #######

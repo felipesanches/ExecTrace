@@ -93,8 +93,7 @@ class ExecTrace():
     self.loglevel = loglevel
     self.rombank = rombank
     self.relocation_address = relocation_address
-    self.rom = [chr(0x00)] * relocation_address
-    self.rom += open(romfile).read()
+    self.rom = open(romfile).read()
     self.visited_ranges = []
     self.pending_entry_points = jump_table
     self.current_entry_point = None
@@ -232,7 +231,7 @@ class ExecTrace():
       self.log_status()
 
   def fetch(self):
-    value = ord(self.rom[self.rombank + self.PC])
+    value = ord(self.rom[self.rombank + self.PC - self.relocation_address])
     self.log(DEBUG, "Fetch at {}: {}".format(hex(self.PC), hex(value)))
     if self.already_visited(self.PC):
       raise AddressAlreadyVisited
@@ -300,7 +299,7 @@ class ExecTrace():
         indent = "LABEL_%04X:\n\t" % next_addr
         data = []
         for addr in range(next_addr, codeblock.start):
-          data.append(hex8(ord(self.rom[self.rombank + addr])))
+          data.append(hex8(ord(self.rom[self.rombank + addr - self.relocation_address])))
           if len(data) == 8:
             asm.write("{}db {}\n".format(indent, ", ".join(data)))
             indent = "\t"

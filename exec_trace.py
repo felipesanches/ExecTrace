@@ -89,10 +89,12 @@ class ExecTrace():
                rombank=0,
                loglevel=ERROR,
                relocation_address=0x0000,
-               jump_table=[]):
+               jump_table=[],
+               variables={}):
     self.loglevel = loglevel
     self.rombank = rombank
     self.relocation_address = relocation_address
+    self.variables = variables
     self.rom = open(romfile).read()
     self.visited_ranges = []
     self.pending_entry_points = jump_table
@@ -291,12 +293,20 @@ class ExecTrace():
     next_addr = self.relocation_address
 
     ranges = sorted(self.visited_ranges, key=lambda cb: cb.start)
+    var_addrs = sorted(self.variables.keys())
 
     # This is a hack to make the disasm output the final
     # block of data in the end of a ROM image:
     ranges.append(CodeBlock(start=self.relocation_address+len(self.rom),
                             end=-1,
                             next_block=[]))
+
+    self.next_var = -1
+    def select_next_var_address():
+      for var in var_addrs:
+        if var > next_addr:
+          self.next_var = var
+          break
 
     for codeblock in ranges:
       if codeblock.start < next_addr:
@@ -307,8 +317,16 @@ class ExecTrace():
 
       if codeblock.start > next_addr:
         indent = "LABEL_%04X:\n\t" % next_addr
+        select_next_var_address()
         data = []
         for addr in range(next_addr, codeblock.start):
+          if addr == self.next_var:
+            if len(data) > 0:
+              asm.write("{}db {}\n".format(indent, ", ".join(data)))
+              data = []
+            indent = "%s:\n\t" % self.variables[self.next_var][0]
+            select_next_var_address()
+            
           data.append(hex8(ord(self.rom[self.rombank + addr - self.relocation_address])))
           if len(data) == 8:
             asm.write("{}db {}\n".format(indent, ", ".join(data)))

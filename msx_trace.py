@@ -10,7 +10,9 @@ import sys
 from exec_trace import ExecTrace, hex8, hex16
 
 KNOWN_VARS = {
-  0x4010: ("ROM_TITLE", "n-str")
+  0x4000: ("ROM_HEADER", "label"),
+  0x4010: ("ROM_TITLE", "n-str"),
+  0x4017: ("ENTRY_POINT", "label"),
 }
 
 KNOWN_SUBROUTINES = {
@@ -29,13 +31,6 @@ jump_tables = []
 def register_jump_table(addr):
   if addr not in jump_tables:
     jump_tables.append(addr)
-
-
-def getVariableName(addr):
-  if addr in KNOWN_VARS.keys():
-    return KNOWN_VARS[addr]
-  else:
-    return hex16(addr)
 
 def get_subroutine_comment(addr):
   if addr in KNOWN_SUBROUTINES.keys():
@@ -150,7 +145,7 @@ class MSX_Trace(ExecTrace):
     elif opcode == 0x22: # 
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
-      return "ld (%s), hl" % getVariableName(addr)
+      return "ld (%s), hl" % self.getVariableName(addr)
 
     elif opcode == 0x28:
       imm = self.fetch()
@@ -161,7 +156,7 @@ class MSX_Trace(ExecTrace):
     elif opcode == 0x2A:
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
-      return "ld hl, (%s)" % getVariableName(addr)
+      return "ld hl, (%s)" % self.getVariableName(addr)
 
     elif opcode == 0x30:
       imm = self.fetch()
@@ -172,7 +167,7 @@ class MSX_Trace(ExecTrace):
     elif opcode == 0x32: # 
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
-      return "ld (%s), a" % getVariableName(addr)
+      return "ld (%s), a" % self.getVariableName(addr)
 
     elif opcode == 0x38:
       imm = self.fetch()
@@ -187,7 +182,7 @@ class MSX_Trace(ExecTrace):
     elif opcode == 0x3a: # 
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
-      return "ld a, (%s)" % getVariableName(addr)
+      return "ld a, (%s)" % self.getVariableName(addr)
 
     elif opcode == 0x76:
       self.return_from_subroutine()
@@ -361,12 +356,12 @@ class MSX_Trace(ExecTrace):
       elif ext_opcode == 0x73:
         addr = self.fetch()
         addr = addr | (self.fetch() << 8)
-        return "ld (%s), sp" % getVariableName(addr)
+        return "ld (%s), sp" % self.getVariableName(addr)
 
       elif ext_opcode == 0x7B:
         addr = self.fetch()
         addr = addr | (self.fetch() << 8)
-        return "ld sp, (%s)" % getVariableName(addr)
+        return "ld sp, (%s)" % self.getVariableName(addr)
 
       else:
         self.illegal_instruction((opcode << 8) | ext_opcode)

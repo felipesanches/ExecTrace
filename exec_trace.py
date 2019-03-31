@@ -179,6 +179,18 @@ class ExecTrace():
     self.log(ERROR, "[{}] ILLEGAL: {}".format(hex(self.PC-1), hex(opcode)))
     sys.exit(-1)
 
+  def getVariableName(self, addr):
+    if addr in self.variables.keys():
+      return self.variables[addr][0]
+    else:
+      return hex16(addr)
+
+  def getLabelName(self, addr):
+    if addr in self.variables.keys():
+      return self.variables[addr][0]
+    else:
+      return "LABEL_%04X" % addr
+
 ### Private methods for computing the code-execution graph structure ###
   def already_visited(self, address):
     if self.PC is not None:
@@ -289,7 +301,7 @@ class ExecTrace():
     asm = open(filename, "w")
     asm.write(self.output_disasm_headers())
 
-    asm.write("\torg %s\n" % hex16(self.relocation_address))
+    asm.write("\n\n\torg %s\n" % hex16(self.relocation_address))
     next_addr = self.relocation_address
 
     ranges = sorted(self.visited_ranges, key=lambda cb: cb.start)
@@ -316,7 +328,7 @@ class ExecTrace():
         continue
 
       if codeblock.start > next_addr:
-        indent = "LABEL_%04X:\n\t" % next_addr
+        indent = self.getLabelName(next_addr) + ":\n\t"
         select_next_var_address()
         data = []
         for addr in range(next_addr, codeblock.start):
@@ -336,7 +348,7 @@ class ExecTrace():
           asm.write("{}db {}\n".format(indent, ", ".join(data)))
 
       address = codeblock.start
-      indent = "LABEL_%04X:\n\t" % address
+      indent = self.getLabelName(address) + ":\n\t"
       for address in range(codeblock.start, codeblock.end+1):
         if address in self.disasm:
           asm.write("%s%s\n" % (indent, self.disasm[address]))

@@ -4,7 +4,7 @@
 #
 # Instruction set described at http://clrhome.org/table/
 # MSX BIOS calls documented at http://www.tabalabs.com.br/msx/msx_tech_hb/msxtech_tabalabs.pdf
-#
+
 import sys
 
 from exec_trace import ExecTrace, hex8, hex16
@@ -31,6 +31,7 @@ KNOWN_VARS = {
 KNOWN_SUBROUTINES = {
   0x0047: ("WRTVDP", "Writes to the VDP register."),
   0x004D: ("WRTVRM", "Writes to the VRAM addressed by [HL]."),
+  0x0056: ("FILVRM", "Fills the VRAM with the specified data."),
   0x005C: ("LIDRVM", "Moves block of memory from memory to VRAM."),
   0x0093: ("WRTPSG", "Writes data to the PSG register."),
   0x0096: ("RDPSG", "Read data from the PSG register."),
@@ -38,6 +39,7 @@ KNOWN_SUBROUTINES = {
   0x013B: ("WSLREG", "Writes to the primary slot register."),
   0x013E: ("RDVDP", "Reads the VPD status register."),
   0x0141: ("SNSMAT", "Returns the status of a specified row of a keyboard matrix."),
+  0x0144: ("PHYDIO", "Performs operation for mass storage devices such as disks."),
 #-------------------------------------
   0x4017: ("ENTRY_POINT_1", ""),
   0x404A: ("LOOP", "wait for interrupts"),
@@ -382,6 +384,16 @@ class MSX_Trace(ExecTrace):
       if ext_opcode in ext_instructions:
         return ext_instructions[ext_opcode]
 
+      elif ext_opcode == 0x43:
+        addr = self.fetch()
+        addr = addr | (self.fetch() << 8)
+        return "ld (%s), bc" % self.getVariableName(addr)
+
+      elif ext_opcode == 0x5B:
+        addr = self.fetch()
+        addr = addr | (self.fetch() << 8)
+        return "ld de, (%s)" % self.getVariableName(addr)
+
       elif ext_opcode == 0x73:
         addr = self.fetch()
         addr = addr | (self.fetch() << 8)
@@ -439,9 +451,34 @@ else:
     0x9765,  
     0x9775,  
     0x9784,  
-    0x9706,
-    0x404C, # interrupt handler
-  ]
+    0x9706]
+
+  # Galaga has got a jump table stored at address 0x90E8 (ROM offset 0x50E8)
+  # There seem to be 13 entries in that table:
+  galaga_jumps.extend([
+    0x90F4,
+    0x9107,
+    0x911B,
+    0x9125,
+    0x912D,
+    0x9135,
+#    0x23E1,
+#    0x1313,
+#    0x2373,
+#    0x2B72,
+#    0x1B2B,
+#    0x1B1A,
+#    0x1A08,
+    0x085F,
+#    0x1857,
+#    0xE1CD
+  ])
+
+  galaga_jumps.append(0x404C) # interrupt handler
+
+  # por intuicao:
+  galaga_jumps.extend([0x41D7, 0x44A1, 0x44AA])
+
   trace = MSX_Trace(gamerom,
                     loglevel=0,
                     relocation_blocks=RELOCATION_BLOCKS,

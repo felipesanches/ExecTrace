@@ -219,7 +219,7 @@ class MSX_Trace(ExecTrace):
       return "%s %s" % (STR1[(opcode >> 3) & 0x07], STR2[opcode & 0x07])
 
     elif opcode & 0xC7 == 0xC0: # conditional ret
-      STR = ['nz', 'z', 'nc', 'c', 'po', 'pe', 'p', 'm'] 
+      STR = ['nz', 'z', 'nc', 'c', 'po', 'pe', 'p', 'm']
       self.return_from_subroutine() # TODO: review this.
       self.schedule_entry_point(self.PC)
       return "ret %s" % STR[(opcode >> 3) & 7]
@@ -229,14 +229,14 @@ class MSX_Trace(ExecTrace):
       return "pop %s" % STR[(opcode >> 4) & 3]
 
     elif opcode & 0xC7 == 0xC2: # jp cond, **
-      STR = ['nz', 'nc', 'po', 'p', 'z', 'c', 'pe', 'm']
+      STR = ['nz', 'z', 'nc', 'c', 'po', 'pe', 'p', 'm']
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
       self.conditional_branch(addr)
       return "jp %s, %s" % (STR[(opcode >> 3) & 7], get_label(addr))
 
     elif opcode & 0xC7 == 0xC4: # conditional CALL
-      STR = ['nz', 'nc', 'po', 'p', 'z', 'c', 'pe', 'm']
+      STR = ['nz', 'z', 'nc', 'c', 'po', 'pe', 'p', 'm']
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
       self.subroutine(addr)

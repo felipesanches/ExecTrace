@@ -17,6 +17,7 @@ KNOWN_VARS = {
 
 KNOWN_SUBROUTINES = {
   0x0047: ("WRTVDP", "Writes to the VDP register."),
+  0x004D: ("WRTVRM", "Writes to the VRAM addressed by [HL]."),
   0x005C: ("LIDRVM", "Moves block of memory from memory to VRAM."),
   0x0093: ("WRTPSG", "Writes data to the PSG register."),
   0x0096: ("RDPSG", "Read data from the PSG register."),
@@ -102,6 +103,10 @@ class MSX_Trace(ExecTrace):
       STR = ['b', 'd', 'h', '(hl)']
       return "inc %s" % STR[(opcode >> 4) & 3]
 
+    elif opcode & 0xCF == 0x05: # dec reg8
+      STR = ['b', 'd', 'h', '(hl)']
+      return "dec %s" % STR[(opcode >> 4) & 3]
+
     elif opcode & 0xCF == 0x06: # ld _8, byte
       STR = ['b', 'd', 'h', '(hl)']
       imm = self.fetch()
@@ -110,6 +115,10 @@ class MSX_Trace(ExecTrace):
     elif opcode & 0xCF == 0x09: # add hl, reg16 
       STR = ['bc', 'de', 'hl', 'sp']
       return "add hl, %s" % STR[(opcode >> 4) & 3]
+
+    elif opcode & 0xCF == 0x0B: #
+      STR = ['bc', 'de', 'hl', 'sp']
+      return "dec %s" % STR[(opcode >> 4) & 3]
 
     elif opcode & 0xCF == 0x0C: # inc reg8
       STR = ['c', 'e', 'l', 'a']
@@ -207,6 +216,25 @@ class MSX_Trace(ExecTrace):
       STR = ['bc', 'de', 'hl', 'af']
       return "pop %s" % STR[(opcode >> 4) & 3]
 
+    elif opcode & 0xC7 == 0xC2: # jp cond, **
+      STR = ['nz', 'nc', 'po', 'p', 'z', 'c', 'pe', 'm']
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      self.conditional_branch(addr)
+      return "jp %s, %s" % (STR[(opcode >> 3) & 7], get_label(addr))
+
+    elif opcode & 0xC7 == 0xC4: # conditional CALL
+      STR = ['nz', 'nc', 'po', 'p', 'z', 'c', 'pe', 'm']
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      self.subroutine(addr)
+      comment = get_subroutine_comment(addr)
+      cond = STR[(opcode >> 3) & 7]
+      if comment:
+        return "call %s, %s\t; %s" % (cond, get_label(addr), comment)
+      else:
+        return "call %s, %s" % (cond, get_label(addr))
+
     elif opcode & 0xCF == 0xC5: # push reg
       STR = ['bc', 'de', 'hl', 'af']
       return "push %s" % STR[(opcode >> 4) & 3]
@@ -218,13 +246,6 @@ class MSX_Trace(ExecTrace):
 
     elif opcode & 0xC7 == 0xC7: # rst
       return "rst %s" % hex8(((opcode >> 3) & 7) * 0x08)
-
-    elif opcode & 0xCF == 0xCA: # jp cond, **
-      STR = ['z', 'c', 'pe', 'm']
-      addr = self.fetch()
-      addr = addr | (self.fetch() << 8)
-      self.conditional_branch(addr)
-      return "jp %s, %s" % (STR[(opcode >> 4) & 3], get_label(addr))
 
     elif opcode == 0xC3: # jump addr
       addr = self.fetch()
@@ -265,18 +286,6 @@ class MSX_Trace(ExecTrace):
         self.illegal_instruction((opcode << 8) | ext_opcode)
         return "; DISASM ERROR! Illegal bit instruction (ext_opcode = %s)" % hex8(ext_opcode)
 
-
-    elif opcode == 0xCC: # conditional CALL
-      STR = ['z', 'c', 'pe', 'm']
-      addr = self.fetch()
-      addr = addr | (self.fetch() << 8)
-      self.subroutine(addr)
-      comment = get_subroutine_comment(addr)
-      cond = STR[(opcode >> 4) & 3]
-      if comment:
-        return "call %s, %s\t; %s" % (cond, get_label(addr), comment)
-      else:
-        return "call %s, %s" % (cond, get_label(addr))
 
     elif opcode == 0xcd: # CALL
       addr = self.fetch()
@@ -410,7 +419,8 @@ else:
     0x9765,  
     0x9775,  
     0x9784,  
-    0x9706
+    0x9706,
+    0x404C # interrupt handler
   ]
   trace = MSX_Trace(gamerom,
                     loglevel=0,
@@ -420,8 +430,8 @@ else:
   trace.run(entry_point=0x4017) #GALAGA!
   #trace.print_grouped_ranges()
 
-  for codeblock in sorted(trace.visited_ranges, key=lambda cb: cb.start):
-    print(hex16(codeblock.start), hex16(codeblock.end))
+  #for codeblock in sorted(trace.visited_ranges, key=lambda cb: cb.start):
+  #  print(hex16(codeblock.start), hex16(codeblock.end))
 
   print('"JP (HL)" instructions found at:\n')
   for t in jump_tables:

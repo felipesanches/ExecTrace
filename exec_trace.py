@@ -86,23 +86,34 @@ class ExecTrace():
   """
   def __init__(self,
                romfile,
-               rombank=0,
                loglevel=ERROR,
-               relocation_address=0x0000,
+               relocation_blocks=None,
                jump_table=[],
                variables={},
                subroutines={}):
     self.loglevel = loglevel
-    self.rombank = rombank
-    self.relocation_address = relocation_address
+    self.relocation_blocks = relocation_blocks
     self.variables = variables
     self.subroutines = subroutines
-    self.rom = open(romfile).read()
     self.visited_ranges = []
     self.pending_entry_points = jump_table
     self.current_entry_point = None
     self.PC = None
     self.disasm = {}
+    self.read_rom(romfile)
+
+  def read_rom(self, filename):
+    if self.relocation_blocks:
+      self.rom = []
+      rom = open(filename)
+      for reloc_from, reloc_to, length in self.relocation_blocks:
+        rom.seek(reloc_from)
+        self.rom.append(rom.read(length))
+    else:
+      self.rom = [open(filename).read()]
+      self.relocation_blocks = (0x0000, 0x0000, len(self.rom))
+    rom.close()
+
 
 ### Public method to start the binary code interpretation ###
   def run(self, entry_point=0x0000):
@@ -240,8 +251,18 @@ class ExecTrace():
     block = CodeBlock(start, end, exit)
     self.visited_ranges.append(block)
 
+  def belongs_to_relocation_block(self, address):
+    for reloc_from, reloc_to, length in self.relocation_blocks:
+      if address >= reloc_to and address < reloc_to + length:
+        return True
+    # otherwise:
+    return False
+
   def schedule_entry_point(self, address):
-    if address < self.relocation_address or self.already_visited(address):
+    if not self.belongs_to_relocation_block(address):
+      return
+
+    if self.already_visited(address):
       return
 
     if address not in self.pending_entry_points:
@@ -250,11 +271,15 @@ class ExecTrace():
       self.log_status()
 
   def fetch(self):
-    value = ord(self.rom[self.rombank + self.PC - self.relocation_address])
-    self.log(DEBUG, "Fetch at {}: {}".format(hex(self.PC), hex(value)))
     if self.already_visited(self.PC):
       raise AddressAlreadyVisited
     else:
+      try:
+        index, physical_address = self.rom_address(self.PC)
+      except:
+        sys.exit("Cannot fetch at %s" % hex16(self.PC))
+      value = ord(self.rom[index][physical_address])
+      self.log(DEBUG, "Fetch at {}: {}".format(hex(self.PC), hex(value)))
       self.PC += 1
     return value
 
@@ -301,21 +326,20 @@ class ExecTrace():
       current = [codeblock.start, codeblock.end]
       return grouped
 
+  def rom_address(self, logical_address):
+    for index, reloc in enumerate(self.relocation_blocks):
+      reloc_from, reloc_to, length = reloc
+      if (logical_address >= reloc_to and
+          logical_address < reloc_to + length):
+        physical_address = reloc_from - reloc_to + logical_address
+        return index, physical_address
+# TODO:
+#   raise RelocationError("The logical address was not found on any relocation block.")
+
+
   def save_disassembly_listing(self, filename="output.asm"):
-    asm = open(filename, "w")
-    asm.write(self.output_disasm_headers())
-
-    asm.write("\n\n\torg %s\n" % hex16(self.relocation_address))
-    next_addr = self.relocation_address
-
     ranges = sorted(self.visited_ranges, key=lambda cb: cb.start)
     var_addrs = sorted(self.variables.keys())
-
-    # This is a hack to make the disasm output the final
-    # block of data in the end of a ROM image:
-    ranges.append(CodeBlock(start=self.relocation_address+len(self.rom),
-                            end=-1,
-                            next_block=[]))
 
     self.next_var = -1
     def select_next_var_address():
@@ -324,40 +348,53 @@ class ExecTrace():
           self.next_var = var
           break
 
-    for codeblock in ranges:
-      if codeblock.start < next_addr:
-        # Skip repeated blocks!
-        # something wrong happened here
-        # I once saw a single byte range "LABEL_25D8: break" showing up twice here...
-        continue
+    asm = open(filename, "w")
+    asm.write(self.output_disasm_headers())
 
-      if codeblock.start > next_addr:
-        indent = self.getLabelName(next_addr) + ":\n\t"
-        select_next_var_address()
-        data = []
-        for addr in range(next_addr, codeblock.start):
-          if addr == self.next_var:
-            if len(data) > 0:
+    for reloc_from, reloc_to, reloc_length in relocation_blocks:
+      asm.write("\n\n\torg %s\n" % hex16(reloc_to))
+      next_addr = reloc_to
+
+      # This is a hack to make the disasm output the final
+      # block of data in the end of a ROM image:
+      ranges.append(CodeBlock(start=reloc_to+reloc_len,
+                              end=-1,
+                              next_block=[]))
+
+      for codeblock in ranges:
+        if codeblock.start < next_addr: # Skip repeated blocks!
+          continue
+
+        if codeblock.start > next_addr: # there's a block of data here
+          indent = self.getLabelName(next_addr) + ":\n\t"
+          select_next_var_address()
+          data = []
+          for addr in range(next_addr, codeblock.start):
+            if addr == self.next_var:
+              if len(data) > 0:
+                asm.write("{}db {}\n".format(indent, ", ".join(data)))
+                data = []
+              indent = "%s:\n\t" % self.variables[self.next_var][0]
+              select_next_var_address()
+            reloc_index, physical_address = self.rom_address(addr)
+            data.append(hex8(ord(self.rom[reloc_index][physical_address])))
+            if len(data) == 8:
               asm.write("{}db {}\n".format(indent, ", ".join(data)))
+              indent = "\t"
               data = []
-            indent = "%s:\n\t" % self.variables[self.next_var][0]
-            select_next_var_address()
-            
-          data.append(hex8(ord(self.rom[self.rombank + addr - self.relocation_address])))
-          if len(data) == 8:
+          if len(data) > 0:
             asm.write("{}db {}\n".format(indent, ", ".join(data)))
-            indent = "\t"
-            data = []
-        if len(data) > 0:
-          asm.write("{}db {}\n".format(indent, ", ".join(data)))
 
-      address = codeblock.start
-      indent = self.getLabelName(address) + ":\n\t"
-      for address in range(codeblock.start, codeblock.end+1):
-        if address in self.disasm:
-          asm.write("%s%s\n" % (indent, self.disasm[address]))
-          indent = "\t"
-      next_addr = codeblock.end + 1
+        # TODO: Maybe we need to ensure codeblocks do not cross relocation block boundaries
+        #       If so, we may need to split them at the boundaries.
+        address = codeblock.start
+        indent = self.getLabelName(address) + ":\n\t"
+        for address in range(codeblock.start, codeblock.end+1):
+          if address in self.disasm:
+            asm.write("%s%s\n" % (indent, self.disasm[address]))
+            indent = "\t"
+        next_addr = codeblock.end + 1
+
     asm.close()
 
 def generate_graph():

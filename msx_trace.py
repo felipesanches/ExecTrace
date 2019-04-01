@@ -15,9 +15,17 @@ def imm16(v):
   else:
     return hex16(v)
 
+RELOCATION_BLOCKS = (
+# physical, logical, length 
+   (0x0000,  0x4000, 0x2000),
+#  (0x2000,  0x6000, 0x2000), # duplicate, ignore.
+   (0x4000,  0x8000, 0x2000),
+#  (0x6000,  0xA000, 0x2000), # duplicate, ignore.
+)
+
 KNOWN_VARS = {
-  0x4000: ("ROM_HEADER", "label"),
-  0x4010: ("ROM_TITLE", "n-str"),
+  0x4000: ("ROM_HEADER_1", "label"),
+  0x4010: ("ROM_TITLE_1", "n-str"),
 }
 
 KNOWN_SUBROUTINES = {
@@ -31,7 +39,7 @@ KNOWN_SUBROUTINES = {
   0x013E: ("RDVDP", "Reads the VPD status register."),
   0x0141: ("SNSMAT", "Returns the status of a specified row of a keyboard matrix."),
 #-------------------------------------
-  0x4017: ("ENTRY_POINT", ""),
+  0x4017: ("ENTRY_POINT_1", ""),
   0x404A: ("LOOP", "wait for interrupts"),
   0x404C: ("INTERRUPT_HANDLER", ""),
 }
@@ -432,11 +440,11 @@ else:
     0x9775,  
     0x9784,  
     0x9706,
-    0x404C # interrupt handler
+    0x404C, # interrupt handler
   ]
   trace = MSX_Trace(gamerom,
                     loglevel=0,
-                    relocation_address=0x4000,
+                    relocation_blocks=RELOCATION_BLOCKS,
                     jump_table=galaga_jumps,
                     variables=KNOWN_VARS,
                     subroutines=KNOWN_SUBROUTINES)

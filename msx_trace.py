@@ -9,10 +9,15 @@ import sys
 
 from exec_trace import ExecTrace, hex8, hex16
 
+def imm16(v):
+  if v in KNOWN_SUBROUTINES.keys():
+    return KNOWN_SUBROUTINES[v][0]
+  else:
+    return hex16(v)
+
 KNOWN_VARS = {
   0x4000: ("ROM_HEADER", "label"),
   0x4010: ("ROM_TITLE", "n-str"),
-  0x4017: ("ENTRY_POINT", "label"),
 }
 
 KNOWN_SUBROUTINES = {
@@ -25,6 +30,10 @@ KNOWN_SUBROUTINES = {
   0x013B: ("WSLREG", "Writes to the primary slot register."),
   0x013E: ("RDVDP", "Reads the VPD status register."),
   0x0141: ("SNSMAT", "Returns the status of a specified row of a keyboard matrix."),
+#-------------------------------------
+  0x4017: ("ENTRY_POINT", ""),
+  0x404A: ("LOOP", "wait for interrupts"),
+  0x404C: ("INTERRUPT_HANDLER", ""),
 }
 
 
@@ -40,6 +49,8 @@ def get_subroutine_comment(addr):
 def get_label(addr):
   if addr in KNOWN_SUBROUTINES.keys():
     return KNOWN_SUBROUTINES[addr][0]
+  elif addr in KNOWN_VARS.keys():
+    return KNOWN_VARS[addr][0]
   elif addr < 0x4000:
     sys.exit("Unknown BIOS call: %s" % hex16(addr))
   else:
@@ -61,8 +72,9 @@ class MSX_Trace(ExecTrace):
 #      header += "%s:\tequ %s\n" % (name, hex16(var))
 
     for addr, v in KNOWN_SUBROUTINES.items():
-      label, comment = v
-      header += "%s:\tequ %s\t; %s\n" % (label, hex16(addr), comment)
+      if addr < 0x4000:
+        label, comment = v
+        header += "%s:\tequ %s\t; %s\n" % (label, hex16(addr), comment)
 
     return header
 
@@ -93,7 +105,7 @@ class MSX_Trace(ExecTrace):
       STR = ['bc', 'de', 'hl', 'sp']
       imm = self.fetch()
       imm = imm | (self.fetch() << 8)
-      return "ld %s, %s" % (STR[(opcode >> 4) & 3], hex16(imm))
+      return "ld %s, %s" % (STR[(opcode >> 4) & 3], imm16(imm))
 
     elif opcode & 0xCF == 0x03: # inc reg16
       STR = ['bc', 'de', 'hl', 'sp']
@@ -318,7 +330,7 @@ class MSX_Trace(ExecTrace):
       elif i_opcode == 0x21: #
         imm = self.fetch()
         imm = imm | (self.fetch() << 8)
-        return "ld %s, %s" % (ireg, hex16(imm))
+        return "ld %s, %s" % (ireg, imm16(imm))
 
       elif i_opcode & 0xCF == 0x4E: #
         STR = ['c', 'e', 'l', 'a']
@@ -426,7 +438,8 @@ else:
                     loglevel=0,
                     relocation_address=0x4000,
                     jump_table=galaga_jumps,
-                    variables=KNOWN_VARS)
+                    variables=KNOWN_VARS,
+                    subroutines=KNOWN_SUBROUTINES)
   trace.run(entry_point=0x4017) #GALAGA!
   #trace.print_grouped_ranges()
 

@@ -90,11 +90,13 @@ class ExecTrace():
                loglevel=ERROR,
                relocation_address=0x0000,
                jump_table=[],
-               variables={}):
+               variables={},
+               subroutines={}):
     self.loglevel = loglevel
     self.rombank = rombank
     self.relocation_address = relocation_address
     self.variables = variables
+    self.subroutines = subroutines
     self.rom = open(romfile).read()
     self.visited_ranges = []
     self.pending_entry_points = jump_table
@@ -188,6 +190,8 @@ class ExecTrace():
   def getLabelName(self, addr):
     if addr in self.variables.keys():
       return self.variables[addr][0]
+    elif addr in self.subroutines.keys():
+      return self.subroutines[addr][0]
     else:
       return "LABEL_%04X" % addr
 

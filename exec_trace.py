@@ -275,10 +275,12 @@ class ExecTrace():
       raise AddressAlreadyVisited
     else:
       try:
-        index, physical_address = self.rom_address(self.PC)
+        index, offset = self.rom_address(self.PC)
+        value = ord(self.rom[index][offset])
       except:
-        sys.exit("Cannot fetch at %s" % hex16(self.PC))
-      value = ord(self.rom[index][physical_address])
+        #print("ROM index = %d / offset = %04X" % (index, offset))
+        sys.exit("Cannot fetch at PC=%s" % hex16(self.PC))
+
       self.log(DEBUG, "Fetch at {}: {}".format(hex(self.PC), hex(value)))
       self.PC += 1
     return value
@@ -331,14 +333,13 @@ class ExecTrace():
       reloc_from, reloc_to, length = reloc
       if (logical_address >= reloc_to and
           logical_address < reloc_to + length):
-        physical_address = reloc_from - reloc_to + logical_address
-        return index, physical_address
-# TODO:
-#   raise RelocationError("The logical address was not found on any relocation block.")
+        offset = logical_address - reloc_to
+        return index, offset
+    sys.exit("The logical address %04X was not found on any relocation block." % logical_address)
 
 
   def save_disassembly_listing(self, filename="output.asm"):
-    ranges = sorted(self.visited_ranges, key=lambda cb: cb.start)
+
     var_addrs = sorted(self.variables.keys())
 
     self.next_var = -1
@@ -351,13 +352,16 @@ class ExecTrace():
     asm = open(filename, "w")
     asm.write(self.output_disasm_headers())
 
-    for reloc_from, reloc_to, reloc_length in relocation_blocks:
+    for reloc_from, reloc_to, reloc_length in self.relocation_blocks:
+      ranges = [r for r in sorted(self.visited_ranges, key=lambda cb: cb.start)
+                if r.start >= reloc_to and r.end < reloc_to + reloc_length]
+
       asm.write("\n\n\torg %s\n" % hex16(reloc_to))
       next_addr = reloc_to
 
       # This is a hack to make the disasm output the final
       # block of data in the end of a ROM image:
-      ranges.append(CodeBlock(start=reloc_to+reloc_len,
+      ranges.append(CodeBlock(start=reloc_to + reloc_length,
                               end=-1,
                               next_block=[]))
 
@@ -376,7 +380,14 @@ class ExecTrace():
                 data = []
               indent = "%s:\n\t" % self.variables[self.next_var][0]
               select_next_var_address()
-            reloc_index, physical_address = self.rom_address(addr)
+            try:
+              reloc_index, physical_address = self.rom_address(addr)
+            except:
+              if len(data) > 0:
+                asm.write("{}db {}\n".format(indent, ", ".join(data)))
+                data = []
+              continue
+
             data.append(hex8(ord(self.rom[reloc_index][physical_address])))
             if len(data) == 8:
               asm.write("{}db {}\n".format(indent, ", ".join(data)))

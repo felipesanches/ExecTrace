@@ -24,8 +24,8 @@ RELOCATION_BLOCKS = (
 )
 
 KNOWN_VARS = {
-  0x4000: ("ROM_HEADER_1", "label"),
-  0x4010: ("ROM_TITLE_1", "n-str"),
+  0x4000: ("ROM_HEADER", "label"),
+  0x4010: ("ROM_TITLE", "n-str"),
 }
 
 KNOWN_SUBROUTINES = {
@@ -469,7 +469,7 @@ else:
 #    0x1B2B,
 #    0x1B1A,
 #    0x1A08,
-    0x085F,
+#    0x085F,
 #    0x1857,
 #    0xE1CD
   ])
@@ -477,7 +477,7 @@ else:
   galaga_jumps.append(0x404C) # interrupt handler
 
   # por intuicao:
-  galaga_jumps.extend([0x41D7, 0x44A1, 0x44AA])
+  #galaga_jumps.extend([0x41D7, 0x44A1, 0x44AA])
 
   trace = MSX_Trace(gamerom,
                     loglevel=0,

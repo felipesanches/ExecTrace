@@ -41,7 +41,7 @@ KNOWN_SUBROUTINES = {
   0x0141: ("SNSMAT", "Returns the status of a specified row of a keyboard matrix."),
   0x0144: ("PHYDIO", "Performs operation for mass storage devices such as disks."),
 #-------------------------------------
-  0x4017: ("ENTRY_POINT_1", ""),
+  0x4017: ("ENTRY_POINT", ""),
   0x404A: ("LOOP", "wait for interrupts"),
   0x404C: ("INTERRUPT_HANDLER", ""),
 }
@@ -261,10 +261,10 @@ class MSX_Trace(ExecTrace):
       STR = ['bc', 'de', 'hl', 'af']
       return "push %s" % STR[(opcode >> 4) & 3]
 
-    elif opcode & 0xCF == 0xC6: # 
-      STR = ['add a,', 'sub', 'and', 'or']
+    elif opcode & 0xC7 == 0xC6: # 
+      STR = ['add a,', 'adc a,', 'sub', 'sbc a,', 'and', 'xor', 'or', 'cp']
       imm = self.fetch()
-      return "%s %s" % (STR[(opcode >> 4) & 3], hex8(imm))
+      return "%s %s" % (STR[(opcode >> 3) & 7], hex8(imm))
 
     elif opcode & 0xC7 == 0xC7: # rst
       return "rst %s" % hex8(((opcode >> 3) & 7) * 0x08)
@@ -477,7 +477,7 @@ else:
   galaga_jumps.append(0x404C) # interrupt handler
 
   # por intuicao:
-  #galaga_jumps.extend([0x41D7, 0x44A1, 0x44AA])
+  galaga_jumps.extend([0x41D7, 0x44A1, 0x44AA, 0x8000])
 
   trace = MSX_Trace(gamerom,
                     loglevel=0,

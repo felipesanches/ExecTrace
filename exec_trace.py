@@ -382,19 +382,49 @@ class ExecTrace():
         if codeblock.start > next_addr: # there's a block of data here
           indent = self.getLabelName(next_addr) + ":\n\t"
           data = []
-          for addr in range(next_addr, codeblock.start):
+          addr = next_addr
+          while addr < codeblock.start:
             select_next_var_address(addr)
             if addr == self.next_var:
               if len(data) > 0:
                 asm.write("{}db {}\n".format(indent, ", ".join(data)))
                 data = []
-              indent = "%s:\n\t" % self.variables[self.next_var][0]
+              var = self.variables[self.next_var]
+              indent = "%s:\n\t" % var[0]
+#============================================================================
+              if var[1] == "str":
+                n = var[2]
+                the_string = ""
+                for i in range(n):
+                  reloc_index, physical_address = self.rom_address(addr)
+                  the_string += self.rom[reloc_index][physical_address]
+                  addr += 1
+                asm.write('{}db "{}"\n'.format(indent, the_string))
+                indent = self.getLabelName(addr) + ":\n\t"
+                data = []
+                continue
+#============================================================================
+              elif var[1] == "n-1-str":
+                reloc_index, physical_address = self.rom_address(addr)
+                n = ord(self.rom[reloc_index][physical_address])
+                the_string = ""
+                addr += 1
+                for i in range(n-1):
+                  reloc_index, physical_address = self.rom_address(addr)
+                  the_string += self.rom[reloc_index][physical_address]
+                  addr += 1
+                asm.write('{}db {}, "{}"\n'.format(indent, n, the_string))
+                indent = self.getLabelName(addr) + ":\n\t"
+                data = []
+                continue
+#============================================================================
             try:
               reloc_index, physical_address = self.rom_address(addr)
             except:
               if len(data) > 0:
                 asm.write("{}db {}\n".format(indent, ", ".join(data)))
                 data = []
+                addr += 1
               continue
 
             data.append(hex8(ord(self.rom[reloc_index][physical_address])))
@@ -402,6 +432,7 @@ class ExecTrace():
               asm.write("{}db {}\n".format(indent, ", ".join(data)))
               indent = "\t"
               data = []
+            addr += 1
 
           if len(data) > 0:
             asm.write("{}db {}\n".format(indent, ", ".join(data)))

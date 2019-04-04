@@ -59,7 +59,7 @@ RELOCATION_BLOCKS = (
 
 KNOWN_VARS = {
   0x4000: ("ROM_HEADER", "label"),
-  0x4010: ("ROM_TITLE", "n-1-str"),
+  0x4010: ("ROM_TITLE", "n-1_str"),
   0x8675: ("GREAT_STR", "str", 6),
   0x97F2: ("LABEL_97F2", "label"), #gfx?
   0x980C: ("LABEL_980C", "label"), #gfx?
@@ -86,10 +86,10 @@ KNOWN_SUBROUTINES = {
 }
 
 
-jump_tables = []
-def register_jump_table(addr):
-  if addr not in jump_tables:
-    jump_tables.append(addr)
+jump_HLs = []
+def register_jump_HL(addr):
+  if addr not in jump_HLs:
+    jump_HLs.append(addr)
 
 def get_subroutine_comment(addr):
   if addr in KNOWN_SUBROUTINES.keys():
@@ -403,7 +403,7 @@ class MSX_Trace(ExecTrace):
       return "and %s" % hex8(imm)
 
     elif opcode == 0xE9:
-      register_jump_table(self.PC-1)
+      register_jump_HL(self.PC-1)
       return "jp (hl)"
 
     elif opcode == 0xED: # EXTENDED INSTRUCTIONS:
@@ -489,7 +489,7 @@ else:
   #  print(hex16(codeblock.start), hex16(codeblock.end))
 
   print('\n"JP (HL)" instructions found at:\n')
-  for t in jump_tables:
-    print("\t0x%04X" % t)
+  for j in jump_HLs:
+    print("\t0x%04X" % j)
 
   trace.save_disassembly_listing("{}.asm".format(gamerom.split(".")[0]))

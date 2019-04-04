@@ -404,7 +404,7 @@ class ExecTrace():
                 data = []
                 continue
 #============================================================================
-              elif var[1] == "n-1-str":
+              elif var[1] == "n-1_str":
                 reloc_index, physical_address = self.rom_address(addr)
                 n = ord(self.rom[reloc_index][physical_address])
                 the_string = ""

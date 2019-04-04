@@ -101,6 +101,13 @@ class ExecTrace():
     self.PC = None
     self.disasm = {}
     self.read_rom(romfile)
+    self.labeled_addresses = []
+    for j in jump_table:
+      self.register_label(j)
+
+  def register_label(self, address):
+    if address not in self.labeled_addresses:
+      self.labeled_addresses.append(address)
 
   def read_rom(self, filename):
     if self.relocation_blocks:
@@ -119,6 +126,7 @@ class ExecTrace():
   def run(self, entry_point=0x0000):
     self.current_entry_point = entry_point
     self.PC = entry_point
+    self.register_label(entry_point)
     while self.PC is not None:
       address = self.PC
       try:
@@ -136,6 +144,7 @@ class ExecTrace():
 
 ### Methods for declaring the behaviour of branching instructions ###
   def subroutine(self, address):
+    self.register_label(address)
     self.add_range(start=self.current_entry_point,
                    end=self.PC-1,
                    exit=[self.PC, address])
@@ -164,6 +173,7 @@ class ExecTrace():
     self.branch(address, conditional=False)
 
   def branch(self, address, conditional):
+    self.register_label(address)
     if address > self.current_entry_point and address < self.PC:
       self.add_range(start=self.current_entry_point,
                      end=address-1,
@@ -399,7 +409,10 @@ class ExecTrace():
         # TODO: Maybe we need to ensure codeblocks do not cross relocation block boundaries
         #       If so, we may need to split them at the boundaries.
         address = codeblock.start
-        indent = self.getLabelName(address) + ":\n\t"
+        if address in self.labeled_addresses:
+          indent = "\n" + self.getLabelName(address) + ":\n\t"
+        else:
+          indent = "\t"
         for address in range(codeblock.start, codeblock.end+1):
           if address in self.disasm:
             asm.write("%s%s\n" % (indent, self.disasm[address]))

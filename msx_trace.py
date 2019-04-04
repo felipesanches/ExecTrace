@@ -485,7 +485,7 @@ else:
   #for codeblock in sorted(trace.visited_ranges, key=lambda cb: cb.start):
   #  print(hex16(codeblock.start), hex16(codeblock.end))
 
-  print('"\nJP (HL)" instructions found at:\n')
+  print('\n"JP (HL)" instructions found at:\n')
   for t in jump_tables:
     print("\t0x%04X" % t)
 

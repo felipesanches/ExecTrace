@@ -31,6 +31,7 @@ KNOWN_VARS = {
   0x4010: ("ROM_TITLE", "n-1_str"),
   0x4197: ("JUMP_TABLE_4197", "jump_table", 11),
   0x5357: ("JUMP_TABLE_5357", "jump_table", 12),
+  0x5BE5: ("POINTERS_5BE5", "pointers", 9),
   0x8675: ("GREAT_STR", "str", 6),
   0x90E8: ("JUMP_TABLE_90E8", "jump_table", 6),
   0x95ED: ("POINTERS_95ED", "pointers", 8), # Note: A jump table would lead to weird BIOS call addresses...
@@ -255,8 +256,8 @@ class MSX_Trace(ExecTrace):
 
     elif opcode & 0xC7 == 0xC0: # conditional ret
       STR = ['nz', 'z', 'nc', 'c', 'po', 'pe', 'p', 'm']
-      self.return_from_subroutine() # TODO: review this.
       self.schedule_entry_point(self.PC)
+      self.return_from_subroutine()
       return "ret %s" % STR[(opcode >> 3) & 7]
 
     elif opcode & 0xCF == 0xC1: # pop reg
@@ -370,6 +371,10 @@ class MSX_Trace(ExecTrace):
         imm = self.fetch()
         imm = imm | (self.fetch() << 8)
         return "ld %s, %s" % (ireg, imm16(imm))
+
+      elif i_opcode == 0x35: #
+        offs = self.fetch()
+        return "dec (%s + %s)" % (ireg, offs)
 
       elif i_opcode == 0x36: #
         offs = self.fetch()

@@ -88,7 +88,6 @@ class ExecTrace():
                romfile,
                loglevel=ERROR,
                relocation_blocks=None,
-               jump_table=[],
                variables={},
                subroutines={}):
     self.loglevel = loglevel
@@ -96,26 +95,55 @@ class ExecTrace():
     self.variables = variables
     self.subroutines = subroutines
     self.visited_ranges = []
-    self.pending_entry_points = jump_table
+    self.pending_entry_points = []
     self.current_entry_point = None
     self.PC = None
     self.disasm = {}
-    self.read_rom(romfile)
     self.labeled_addresses = []
-    for j in jump_table:
-      self.register_label(j)
+
+    self.read_rom(romfile)
+
+    to_register = []
+    for var_addr, var in self.variables.items():
+      self.register_label(var[0])
+      if var[1] in ["jump_table", "pointers"]:
+        for i in range(var[2]):
+          ptr = self.read_word(var_addr + 2*i)
+          to_register.append(ptr)
+          if var[1] == "jump_table":
+            self.pending_entry_points.append(ptr)
+
+    for ptr in to_register:
+      print("Register pointer %04X" % ptr)
+      self.variables[ptr] = ("LABEL_%04X" % ptr, "label")
+      self.register_label(ptr)
+
+    for subr_addr in self.subroutines.keys():
+      self.register_label(subr_addr)
+
+
+  def read_word(self, addr):
+    value = self.read_byte(addr)
+    value = value | (self.read_byte(addr+1) << 8)
+    return value
+
+  def read_byte(self, addr):
+    reloc_index, physical_address = self.rom_address(addr)
+    return self.rom[reloc_index][physical_address]
 
   def register_label(self, address):
     if address not in self.labeled_addresses:
       self.labeled_addresses.append(address)
+    
 
   def read_rom(self, filename):
     if self.relocation_blocks:
       self.rom = []
-      rom = open(filename)
+      rom = open(filename, "rb")
       for reloc_from, reloc_to, length in self.relocation_blocks:
         rom.seek(reloc_from)
-        self.rom.append(rom.read(length))
+        binary_data = rom.read(length)
+        self.rom.append(binary_data)
     else:
       self.rom = [open(filename).read()]
       self.relocation_blocks = (0x0000, 0x0000, len(self.rom))
@@ -123,10 +151,11 @@ class ExecTrace():
 
 
 ### Public method to start the binary code interpretation ###
-  def run(self, entry_point=0x0000):
-    self.current_entry_point = entry_point
-    self.PC = entry_point
-    self.register_label(entry_point)
+  def run(self, entry_points=[0x0000]):
+    self.pending_entry_points.extend(entry_points)
+    self.current_entry_point = self.pending_entry_points.pop(0)
+    self.PC = self.current_entry_point
+    self.register_label(self.current_entry_point)
     while self.PC is not None:
       address = self.PC
       try:
@@ -233,7 +262,7 @@ class ExecTrace():
                                 next_block=[address])
           codeblock.start = address
           # and also split ownership of subroutine calls:
-          for instr_addr, call_addr in codeblock.subroutines.iteritems():
+          for instr_addr, call_addr in codeblock.subroutines.items():
             if instr_addr < address:
               new_block.add_subroutine_call(instr_addr, call_addr)
               del codeblock.subroutines[instr_addr]
@@ -286,7 +315,7 @@ class ExecTrace():
     else:
       try:
         index, offset = self.rom_address(self.PC)
-        value = ord(self.rom[index][offset])
+        value = self.rom[index][offset]
       except:
         #print("ROM index = %d / offset = %04X" % (index, offset))
         sys.exit("Cannot fetch at PC=%s" % hex16(self.PC))
@@ -397,7 +426,7 @@ class ExecTrace():
                 the_string = ""
                 for i in range(n):
                   reloc_index, physical_address = self.rom_address(addr)
-                  the_string += self.rom[reloc_index][physical_address]
+                  the_string += chr(self.rom[reloc_index][physical_address])
                   addr += 1
                 asm.write('{}db "{}"\n'.format(indent, the_string))
                 indent = self.getLabelName(addr) + ":\n\t"
@@ -406,14 +435,30 @@ class ExecTrace():
 #============================================================================
               elif var[1] == "n-1_str":
                 reloc_index, physical_address = self.rom_address(addr)
-                n = ord(self.rom[reloc_index][physical_address])
+                n = self.rom[reloc_index][physical_address]
                 the_string = ""
                 addr += 1
                 for i in range(n-1):
                   reloc_index, physical_address = self.rom_address(addr)
-                  the_string += self.rom[reloc_index][physical_address]
+                  the_string += chr(self.rom[reloc_index][physical_address])
                   addr += 1
                 asm.write('{}db {}, "{}"\n'.format(indent, n, the_string))
+                indent = self.getLabelName(addr) + ":\n\t"
+                data = []
+                continue
+#============================================================================
+              if var[1] in ["jump_table", "pointers"]:
+                n = var[2]
+                asm.write("\n")
+                for i in range(n):
+                  reloc_index, physical_address = self.rom_address(addr)
+                  jump_addr = self.rom[reloc_index][physical_address]
+                  addr += 1
+                  reloc_index, physical_address = self.rom_address(addr)
+                  jump_addr = jump_addr | (self.rom[reloc_index][physical_address] << 8)
+                  addr += 1
+                  asm.write('{}dw {}\n'.format(indent, self.getLabelName(jump_addr)))
+                  indent = "\t"
                 indent = self.getLabelName(addr) + ":\n\t"
                 data = []
                 continue
@@ -427,7 +472,7 @@ class ExecTrace():
                 addr += 1
               continue
 
-            data.append(hex8(ord(self.rom[reloc_index][physical_address])))
+            data.append(hex8(self.rom[reloc_index][physical_address]))
             if len(data) == 8:
               asm.write("{}db {}\n".format(indent, ", ".join(data)))
               indent = "\t"
@@ -458,9 +503,9 @@ def generate_graph():
 
   import pydotplus
   graph = pydotplus.graphviz.Graph(graph_name='Code Execution Graph',
-			   graph_type='digraph',
-			   strict=False,
-			   suppress_disconnected=False)
+                                   graph_type='digraph',
+                                   strict=False,
+                                   suppress_disconnected=False)
   graph_dict = {}
   for block in self.visited_ranges:
     node = pydotplus.graphviz.Node(block_name(block))
@@ -470,13 +515,13 @@ def generate_graph():
   for block in self.visited_ranges:
     for nb in block.next_block:
       if nb is str:
-	print nb  # this must be an illegal instruction
+        print(nb)  # this must be an illegal instruction
       else:
-	if nb in graph_dict.keys():
-	  edge = pydotplus.graphviz.Edge(graph_dict[block.start], graph_dict[nb])
-	  graph.add_edge(edge)
-	else:
-	  print "Missing codeblock: {}".format(hex(nb))
+        if nb in graph_dict.keys():
+          edge = pydotplus.graphviz.Edge(graph_dict[block.start], graph_dict[nb])
+          graph.add_edge(edge)
+        else:
+          print("Missing codeblock: {}".format(hex(nb)))
 
   open("output.gv", "w").write(graph.to_string())
 

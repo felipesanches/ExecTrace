@@ -9,46 +9,6 @@ import sys
 
 from exec_trace import ExecTrace, hex8, hex16
 
-galaga_entry = 0x4017
-
-# Galaga has got a jump table stored at address 0x95FD (ROM offset 0x55FD)
-# There seem to be 13 entries in that table:
-galaga_jumps = [
-  0x9633, 0x9680, 0x96b7, 0x96c3,
-  0x96f0, 0x96d9, 0x9732, 0x9746,
-  0x975e, 0x9765, 0x9775, 0x9784,
-  0x9706]
-
-#------
-# Interestingly, the table seems to start a few bytes before that,
-# also including these other addresses. But I am not sure if they are valid:
-# galaga_jumps.extend([
-#  0x9E4D, 0x9E8F, 0x9EC0, 0x9EF1, 0x9F22, 0x9D64, 0x9D23, 0x9F53
-# ])
-# Note: commented out because this leads to weird BIOS call addresses.
-#------
-
-# Galaga has got a jump table stored at address 0x90E8 (ROM offset 0x50E8)
-# There seem to be 6 entries in that table:
-galaga_jumps.extend([0x90F4, 0x9107, 0x911B, 0x9125, 0x912D, 0x9135])
-
-# por intuicao:
-galaga_jumps.extend([
-  0x41D7, 0x44A1, 0x44AA, 0x8000,
-  0x44B9, 0x44FC, 0x4550, 0x8655])
-
-galaga_jumps.append(0x404C) # interrupt handler
-
-
-
-def imm16(v):
-  if v in KNOWN_SUBROUTINES.keys():
-    return KNOWN_SUBROUTINES[v][0]
-  elif v in KNOWN_VARS.keys():
-    return KNOWN_VARS[v][0]
-  else:
-    return hex16(v)
-
 RELOCATION_BLOCKS = (
 # physical, logical, length 
    (0x0000,  0x4000, 0x2000),
@@ -57,12 +17,24 @@ RELOCATION_BLOCKS = (
 #  (0x6000,  0xA000, 0x2000), # duplicate, ignore.
 )
 
+galaga_entry_points = [
+  0x4017, # main entry-point
+  0x404C, # interrupt handler
+#------ Guesses: -----------
+  0x41D7, 0x44A1, 0x44AA, 0x8000,
+  0x44B9, 0x44FC, 0x4550, 0x8655
+]
+
 KNOWN_VARS = {
   0x4000: ("ROM_HEADER", "label"),
   0x4010: ("ROM_TITLE", "n-1_str"),
   0x8675: ("GREAT_STR", "str", 6),
+  0x90E8: ("JUMP_TABLE_90E8", "jump_table", 6),
+  0x95ED: ("POINTERS_95ED", "pointers", 8), # Note: A jump table would lead to weird BIOS call addresses...
+  0x95FD: ("JUMP_TABLE_95FD", "jump_table", 13),
   0x97F2: ("LABEL_97F2", "label"), #gfx?
   0x980C: ("LABEL_980C", "label"), #gfx?
+  0x98E6: ("LABEL_98E6", "label"), #gfx?
   0x997B: ("NAMCO_TILES", "gfx"),
   0x9A23: ("A_Z_TILES", "gfx"),
 }
@@ -85,6 +57,14 @@ KNOWN_SUBROUTINES = {
   0x404C: ("INTERRUPT_HANDLER", ""),
 }
 
+
+def imm16(v):
+  if v in KNOWN_SUBROUTINES.keys():
+    return KNOWN_SUBROUTINES[v][0]
+  elif v in KNOWN_VARS.keys():
+    return KNOWN_VARS[v][0]
+  else:
+    return hex16(v)
 
 jump_HLs = []
 def register_jump_HL(addr):
@@ -474,15 +454,14 @@ if len(sys.argv) != 2:
   print("usage: {} <filename.rom>".format(sys.argv[0]))
 else:
   gamerom = sys.argv[1]
-  print "disassembling {}...".format(gamerom)
+  print("disassembling {}...".format(gamerom))
 
   trace = MSX_Trace(gamerom,
                     loglevel=0,
                     relocation_blocks=RELOCATION_BLOCKS,
-                    jump_table=galaga_jumps,
                     variables=KNOWN_VARS,
                     subroutines=KNOWN_SUBROUTINES)
-  trace.run(entry_point=galaga_entry)
+  trace.run(entry_points=galaga_entry_points)
   #trace.print_grouped_ranges()
 
   #for codeblock in sorted(trace.visited_ranges, key=lambda cb: cb.start):

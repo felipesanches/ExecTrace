@@ -22,21 +22,26 @@ galaga_entry_points = [
   0x404C, # interrupt handler
 #------ Guesses: -----------
   0x41D7, 0x44A1, 0x44AA, 0x8000,
-  0x44B9, 0x44FC, 0x4550, 0x8655
+  0x44B9, 0x44FC, 0x4550, 0x8655,
+  0x914C
 ]
 
 KNOWN_VARS = {
   0x4000: ("ROM_HEADER", "label"),
   0x4010: ("ROM_TITLE", "n-1_str"),
+  0x4197: ("JUMP_TABLE_4197", "jump_table", 11),
+  0x5357: ("JUMP_TABLE_5357", "jump_table", 12),
   0x8675: ("GREAT_STR", "str", 6),
   0x90E8: ("JUMP_TABLE_90E8", "jump_table", 6),
   0x95ED: ("POINTERS_95ED", "pointers", 8), # Note: A jump table would lead to weird BIOS call addresses...
   0x95FD: ("JUMP_TABLE_95FD", "jump_table", 13),
+  0x97EC: ("POINTERS_97EC", "pointers", 3),
   0x97F2: ("LABEL_97F2", "label"), #gfx?
   0x980C: ("LABEL_980C", "label"), #gfx?
   0x98E6: ("LABEL_98E6", "label"), #gfx?
   0x997B: ("NAMCO_TILES", "gfx"),
   0x9A23: ("A_Z_TILES", "gfx"),
+  0x9B1B: ("SHIP", "gfx"),
 }
 
 KNOWN_SUBROUTINES = {
@@ -350,6 +355,10 @@ class MSX_Trace(ExecTrace):
         ireg = "iy"
 
       i_instructions = {
+        0x09: "add %s, bc",
+        0x19: "add %s, de",
+        0x29: "add %s, ix",
+        0x39: "add %s, sp",
         0x23: "inc %s",
         0xE1: "pop %s",
         0xE5: "push %s",
@@ -362,6 +371,11 @@ class MSX_Trace(ExecTrace):
         imm = imm | (self.fetch() << 8)
         return "ld %s, %s" % (ireg, imm16(imm))
 
+      elif i_opcode == 0x36: #
+        offs = self.fetch()
+        imm = self.fetch()
+        return "ld (%s + %s), %s" % (ireg, offs, imm)
+
       elif i_opcode & 0xCF == 0x4E: #
         STR = ['c', 'e', 'l', 'a']
         imm = self.fetch()
@@ -371,6 +385,15 @@ class MSX_Trace(ExecTrace):
         STR = ['b', 'd', 'h']
         imm = self.fetch()
         return "ld %s, (%s + %s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
+
+      elif i_opcode == 0x77: #
+        imm = self.fetch()
+        return "ld (%s + %s), a" % (ireg, imm)
+
+      elif i_opcode & 0xCF == 0x86: #
+        STR = ['add a,', 'sub', 'and', 'or']
+        imm = self.fetch()
+        return "%s (%s + %s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
 
       else:
         self.illegal_instruction((opcode << 8) | i_opcode)
@@ -404,10 +427,17 @@ class MSX_Trace(ExecTrace):
       if ext_opcode in ext_instructions:
         return ext_instructions[ext_opcode]
 
-      elif ext_opcode == 0x43:
+      elif ext_opcode & 0xCF == 0x43:
+        STR = ['bc', 'de', 'hl', 'sp']
         addr = self.fetch()
         addr = addr | (self.fetch() << 8)
-        return "ld (%s), bc" % self.getVariableName(addr)
+        return "ld (%s), %s" % (self.getVariableName(addr), STR[(ext_opcode >> 4) & 3])
+
+      elif ext_opcode & 0xCF == 0x4B:
+        STR = ['bc', 'de', 'hl', 'sp']
+        addr = self.fetch()
+        addr = addr | (self.fetch() << 8)
+        return "ld %s, (%s)" % (STR[(ext_opcode >> 4) & 3], self.getVariableName(addr))
 
       elif ext_opcode == 0x5B:
         addr = self.fetch()

@@ -115,7 +115,8 @@ class ExecTrace():
 
     for ptr in to_register:
       print("Register pointer %04X" % ptr)
-      self.variables[ptr] = ("LABEL_%04X" % ptr, "label")
+      if ptr not in self.variables.keys():
+        self.variables[ptr] = ("LABEL_%04X" % ptr, "label")
       self.register_label(ptr)
 
     for subr_addr in self.subroutines.keys():
@@ -277,6 +278,7 @@ class ExecTrace():
       self.PC = None  # This will finish the crawling
     else:
       address = self.pending_entry_points.pop()
+      self.register_label(address)
       self.current_entry_point = address
       self.PC = address
       self.log(VERBOSE, "Restarting from: {}".format(hex(address)))

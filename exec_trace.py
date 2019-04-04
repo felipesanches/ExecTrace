@@ -353,11 +353,11 @@ class ExecTrace():
     var_addrs = sorted(self.variables.keys())
 
     self.next_var = -1
-    def select_next_var_address():
+    def select_next_var_address(addr):
       for var in var_addrs:
-        if var > next_addr:
+        if var >= addr:
           self.next_var = var
-          break
+          return
 
     asm = open(filename, "w")
     asm.write(self.output_disasm_headers())
@@ -381,15 +381,14 @@ class ExecTrace():
 
         if codeblock.start > next_addr: # there's a block of data here
           indent = self.getLabelName(next_addr) + ":\n\t"
-          select_next_var_address()
           data = []
           for addr in range(next_addr, codeblock.start):
+            select_next_var_address(addr)
             if addr == self.next_var:
               if len(data) > 0:
                 asm.write("{}db {}\n".format(indent, ", ".join(data)))
                 data = []
               indent = "%s:\n\t" % self.variables[self.next_var][0]
-              select_next_var_address()
             try:
               reloc_index, physical_address = self.rom_address(addr)
             except:
@@ -403,6 +402,7 @@ class ExecTrace():
               asm.write("{}db {}\n".format(indent, ", ".join(data)))
               indent = "\t"
               data = []
+
           if len(data) > 0:
             asm.write("{}db {}\n".format(indent, ", ".join(data)))
 

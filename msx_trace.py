@@ -61,6 +61,9 @@ KNOWN_VARS = {
   0x4000: ("ROM_HEADER", "label"),
   0x4010: ("ROM_TITLE", "n-str"),
   0x8675: ("GREAT_STR", "str"),
+  0x97F2: ("LABEL_97F2", "label"), #gfx?
+  0x980C: ("LABEL_980C", "label"), #gfx?
+  0x997B: ("NAMCO_TILES", "gfx"),
   0x9A23: ("A_Z_TILES", "gfx"),
 }
 

@@ -21,30 +21,37 @@ galaga_entry_points = [
   0x4017, # main entry-point
   0x404C, # interrupt handler
 #------ Guesses: -----------
-  0x44A1,
-  0x44AA,
-  0x44B9,
-  0x44FC,
-  0x4550, 
+#  0x44A1,
+#  0x44AA,
+#  0x44B9,
+#  0x44FC,
+#  0x4550, 
 ]
 
 KNOWN_VARS = {
   0x4000: ("ROM_HEADER", "label"),
   0x4010: ("ROM_TITLE", "n-1_str"),
-  0x4197: ("JUMP_TABLE_4197", "jump_table", 11),
-  0x5357: ("JUMP_TABLE_5357", "jump_table", 12),
-  0x5BE5: ("POINTERS_5BE5", "pointers", 9),
   0x8675: ("GREAT_STR", "str", 6),
-  0x90E8: ("JUMP_TABLE_90E8", "jump_table", 6),
-  0x95ED: ("POINTERS_95ED", "pointers", 8), # Note: A jump table would lead to weird BIOS call addresses...
-  0x95FD: ("JUMP_TABLE_95FD", "jump_table", 13),
-  0x97EC: ("POINTERS_97EC", "pointers", 3),
-  0x97F2: ("LABEL_97F2", "label"), #gfx?
-  0x980C: ("LABEL_980C", "label"), #gfx?
-  0x98E6: ("LABEL_98E6", "label"), #gfx?
   0x997B: ("NAMCO_TILES", "gfx"),
   0x9A23: ("A_Z_TILES", "gfx"),
-  0x9B1B: ("SHIP", "gfx"),
+  0x9B1B: ("LIFE", "gfx"),
+  #0x9B1B + 49*8: ("SHIP_00", "gfx"), # 16 bytes
+  0x9CA3: ("SHIP_00", "gfx"), # 16 bytes
+  0x9CB3: ("SHIP_45", "gfx"), # 32 bytes
+  0x9CD3: ("MOTHERSHIP_A_00", "gfx"), # 16 bytes
+  0x9CE3: ("MOTHERSHIP_B_00", "gfx"), # 16 bytes
+  0x9CF3: ("MOTHERSHIP_B_45", "gfx"), # 32 bytes
+  0x90E8: ("JUMP_TABLE_90E8", "jump_table", 6),
+
+#  0x4197: ("JUMP_TABLE_4197", "jump_table", 11),
+#  0x5357: ("JUMP_TABLE_5357", "jump_table", 12),
+#  0x5BE5: ("POINTERS_5BE5", "pointers", 9),
+#  0x95ED: ("POINTERS_95ED", "pointers", 8), # Note: A jump table would lead to weird BIOS call addresses...
+#  0x95FD: ("JUMP_TABLE_95FD", "jump_table", 13),
+#  0x97EC: ("POINTERS_97EC", "pointers", 3),
+#  0x97F2: ("LABEL_97F2", "label"), #gfx?
+#  0x980C: ("LABEL_980C", "label"), #gfx?
+#  0x98E6: ("LABEL_98E6", "label"), #gfx?
 }
 
 KNOWN_SUBROUTINES = {
@@ -65,6 +72,17 @@ KNOWN_SUBROUTINES = {
   0x404C: ("INTERRUPT_HANDLER", ""),
 }
 
+# Stack manipulation instructions found at:
+#
+stack_whitelist = [
+ 0x4026, # ld sp, 0xE700 # Stack init right after ENTRY_POINT
+ 0x404E, # ld sp, 0xE700 # Stack init at INTERRUPT_HANDLER 
+# 0x4066 = suspeito.
+# 0x4169 / 0x416C = suspeitos.
+ 0x8AE5, 0x8AF6, # OK
+]
+
+
 
 def imm16(v):
   if v in KNOWN_SUBROUTINES.keys():
@@ -78,6 +96,11 @@ jump_HLs = []
 def register_jump_HL(addr):
   if addr not in jump_HLs:
     jump_HLs.append(addr)
+
+stack_tricks = []
+def register_stack_trick(addr):
+  if addr not in stack_tricks and addr not in stack_whitelist:
+    stack_tricks.append(addr)
 
 def get_subroutine_comment(addr):
   if addr in KNOWN_SUBROUTINES.keys():
@@ -132,21 +155,30 @@ class MSX_Trace(ExecTrace):
       0x2f: "cpl",
       0xd9: "exx",
       0xeb: "ex de, hl",
-      0xf9: "ld sp, hl", # TODO: This may be used to change exec flow by changing the ret address in the stack
       0xfb: "ei",
     }
 
     if opcode in simple_instructions:
       return simple_instructions[opcode]
 
+    elif opcode == 0xf9:
+      # This may be used to change exec flow
+      # by changing the ret address in the stack
+      register_stack_trick(self.PC-1)
+      return "ld sp, hl"
+
     elif opcode & 0xCF == 0x01: # ld reg16, word
       STR = ['bc', 'de', 'hl', 'sp']
       imm = self.fetch()
       imm = imm | (self.fetch() << 8)
+      if ((opcode >> 4) & 3) == 3:
+        register_stack_trick(self.PC-1)
       return "ld %s, %s" % (STR[(opcode >> 4) & 3], imm16(imm))
 
     elif opcode & 0xCF == 0x03: # inc reg16
       STR = ['bc', 'de', 'hl', 'sp']
+      if ((opcode >> 4) & 3) == 3:
+        register_stack_trick(self.PC-1)
       return "inc %s" % STR[(opcode >> 4) & 3]
 
     elif opcode & 0xCF == 0x04: # inc reg8
@@ -168,6 +200,8 @@ class MSX_Trace(ExecTrace):
 
     elif opcode & 0xCF == 0x0B: #
       STR = ['bc', 'de', 'hl', 'sp']
+      if ((opcode >> 4) & 3) == 3:
+        register_stack_trick(self.PC-1)
       return "dec %s" % STR[(opcode >> 4) & 3]
 
     elif opcode & 0xCF == 0x0C: # inc reg8
@@ -295,6 +329,7 @@ class MSX_Trace(ExecTrace):
       return "%s %s" % (STR[(opcode >> 3) & 7], hex8(imm))
 
     elif opcode & 0xC7 == 0xC7: # rst
+      self.return_from_subroutine()
       return "rst %s" % hex8(((opcode >> 3) & 7) * 0x08)
 
     elif opcode == 0xC3: # jump addr
@@ -414,6 +449,7 @@ class MSX_Trace(ExecTrace):
 
     elif opcode == 0xE9:
       register_jump_HL(self.PC-1)
+      self.return_from_subroutine()
       return "jp (hl)"
 
     elif opcode == 0xED: # EXTENDED INSTRUCTIONS:
@@ -444,6 +480,8 @@ class MSX_Trace(ExecTrace):
         STR = ['bc', 'de', 'hl', 'sp']
         addr = self.fetch()
         addr = addr | (self.fetch() << 8)
+        if ((ext_opcode >> 4) & 3) == 3:
+          register_stack_trick(self.PC-1)
         return "ld %s, (%s)" % (STR[(ext_opcode >> 4) & 3], self.getVariableName(addr))
 
       elif ext_opcode == 0x5B:
@@ -459,6 +497,7 @@ class MSX_Trace(ExecTrace):
       elif ext_opcode == 0x7B:
         addr = self.fetch()
         addr = addr | (self.fetch() << 8)
+        register_stack_trick(self.PC-1)
         return "ld sp, (%s)" % self.getVariableName(addr)
 
       else:
@@ -507,5 +546,9 @@ else:
   print('\n"JP (HL)" instructions found at:\n')
   for j in jump_HLs:
     print("\t0x%04X" % j)
+
+  print('\nSuspicious stack manipulation instructions found at:\n')
+  for st in stack_tricks:
+    print("\t0x%04X" % st)
 
   trace.save_disassembly_listing("{}.asm".format(gamerom.split(".")[0]))

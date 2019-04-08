@@ -5,7 +5,6 @@
 # Instruction set described at http://clrhome.org/table/
 # MSX BIOS calls documented at http://www.tabalabs.com.br/msx/msx_tech_hb/msxtech_tabalabs.pdf
 #
-import os
 import sys
 
 from exec_trace import ExecTrace, ERROR, hex8, hex16

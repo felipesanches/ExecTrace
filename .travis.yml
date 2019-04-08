@@ -1,0 +1,16 @@
+language: python
+python:
+  - "3.6"
+
+branches:
+  only:
+  - master
+
+install:
+- pip install -r requirements.txt
+- pip install pylint
+#- pip install pytest
+
+script:
+- source lint.sh
+#- pytest --verbose

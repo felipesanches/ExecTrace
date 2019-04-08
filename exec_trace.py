@@ -498,36 +498,3 @@ class ExecTrace():
         next_addr = codeblock.end + 1
 
     asm.close()
-
-def generate_graph():
-  def block_name(block):
-    return "{}-{}".format(hex(block.start), hex(block.end))
-
-  import pydotplus
-  graph = pydotplus.graphviz.Graph(graph_name='Code Execution Graph',
-                                   graph_type='digraph',
-                                   strict=False,
-                                   suppress_disconnected=False)
-  graph_dict = {}
-  for block in self.visited_ranges:
-    node = pydotplus.graphviz.Node(block_name(block))
-    graph.add_node(node)
-    graph_dict[block.start] = node
-
-  for block in self.visited_ranges:
-    for nb in block.next_block:
-      if nb is str:
-        print(nb)  # this must be an illegal instruction
-      else:
-        if nb in graph_dict.keys():
-          edge = pydotplus.graphviz.Edge(graph_dict[block.start], graph_dict[nb])
-          graph.add_edge(edge)
-        else:
-          print("Missing codeblock: {}".format(hex(nb)))
-
-  open("output.gv", "w").write(graph.to_string())
-
-  #from graphviz import Digraph
-  #dot = Digraph(comment='Code Execution Graph')
-  #dot.render('test-output/round-table.gv', view=True)
-

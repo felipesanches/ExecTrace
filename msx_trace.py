@@ -334,6 +334,16 @@ class MSX_Trace(ExecTrace):
         n = (ext_opcode >> 3) & 7
         return "bit %d, %s" % (n, STR[ext_opcode & 0x07])
 
+      elif ext_opcode & 0xC0 == 0x80: # res n, ??
+        STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+        n = (ext_opcode >> 3) & 7
+        return "res %d, %s" % (n, STR[ext_opcode & 0x07])
+
+      elif ext_opcode & 0xC0 == 0xC0: # set n, ??
+        STR = ['b', 'c', 'd', 'e', 'h', 'l', '(hl)', 'a']
+        n = (ext_opcode >> 3) & 7
+        return "set %d, %s" % (n, STR[ext_opcode & 0x07])
+
       else:
         self.illegal_instruction((opcode << 8) | ext_opcode)
         return "; DISASM ERROR! Illegal bit instruction (ext_opcode = %s)" % hex8(ext_opcode)

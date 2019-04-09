@@ -427,6 +427,7 @@ class MSX_Trace(ExecTrace):
         0x4C: "neg",
         0x52: "sbc hl, de",
         0x54: "neg",
+        0x56: "im 1",
         0x5C: "neg",
         0x64: "neg",
         0x6C: "neg",

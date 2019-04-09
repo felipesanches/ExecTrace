@@ -11,6 +11,8 @@ from exec_trace import ExecTrace, ERROR, hex8, hex16
 
 
 MSX_BIOS_CALLS = {
+  0x0024: ("ENASLT", ("Selects the appropriate slot according to the value"
+                      " given through registers, and permanently.")),
   0x0047: ("WRTVDP", "Writes to the VDP register."),
   0x004D: ("WRTVRM", "Writes to the VRAM addressed by [HL]."),
   0x0056: ("FILVRM", "Fills the VRAM with the specified data."),

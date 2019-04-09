@@ -14,14 +14,16 @@ MSX_BIOS_CALLS = {
   0x0024: ("ENASLT", ("Selects the appropriate slot according to the value"
                       " given through registers, and permanently.")),
   0x0047: ("WRTVDP", "Writes to the VDP register."),
+  0x004A: ("RDVRM",  "Reads the VRAM addressed by [HL]."),
   0x004D: ("WRTVRM", "Writes to the VRAM addressed by [HL]."),
+  0x0053: ("SETWRT", "Sets up the VDP for write."),
   0x0056: ("FILVRM", "Fills the VRAM with the specified data."),
   0x005C: ("LIDRVM", "Moves block of memory from memory to VRAM."),
   0x0093: ("WRTPSG", "Writes data to the PSG register."),
-  0x0096: ("RDPSG", "Read data from the PSG register."),
+  0x0096: ("RDPSG",  "Read data from the PSG register."),
   0x0138: ("RSLREG", "Reads the current output to the primary slot register."),
   0x013B: ("WSLREG", "Writes to the primary slot register."),
-  0x013E: ("RDVDP", "Reads the VPD status register."),
+  0x013E: ("RDVDP",  "Reads the VPD status register."),
   0x0141: ("SNSMAT", "Returns the status of a specified row of a keyboard matrix."),
   0x0144: ("PHYDIO", "Performs operation for mass storage devices such as disks."),
 }
@@ -121,6 +123,7 @@ class MSX_Trace(ExecTrace):
       0x1f: "rra",
       0x27: "daa",
       0x2f: "cpl",
+      0x37: "scf",
       0xd9: "exx",
       0xeb: "ex de, hl",
       0xf3: "di",
@@ -374,9 +377,9 @@ class MSX_Trace(ExecTrace):
       i_instructions = {
         0x09: "add %s, bc",
         0x19: "add %s, de",
+        0x23: "inc %s",
         0x29: "add %s, ix",
         0x39: "add %s, sp",
-        0x23: "inc %s",
         0xE1: "pop %s",
         0xE5: "push %s",
       }
@@ -387,6 +390,10 @@ class MSX_Trace(ExecTrace):
         imm = self.fetch()
         imm = imm | (self.fetch() << 8)
         return "ld %s, %s" % (ireg, self.imm16(imm))
+
+      elif i_opcode == 0x34: #
+        offs = self.fetch()
+        return "inc (%s + %s)" % (ireg, offs)
 
       elif i_opcode == 0x35: #
         offs = self.fetch()
@@ -407,14 +414,44 @@ class MSX_Trace(ExecTrace):
         imm = self.fetch()
         return "ld %s, (%s + %s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
 
-      elif i_opcode == 0x77: #
+      elif i_opcode in [0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x77]: #
+        STR = ['b', 'c', 'd', 'e', 'h', 'l', None, 'a']
         imm = self.fetch()
-        return "ld (%s + %s), a" % (ireg, imm)
+        return "ld (%s + %s), %s" % (ireg, imm, STR[i_opcode & 3])
 
       elif i_opcode & 0xCF == 0x86: #
         STR = ['add a,', 'sub', 'and', 'or']
         imm = self.fetch()
         return "%s (%s + %s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
+
+      elif i_opcode & 0xCF == 0x8E: #
+        STR = ['adc a,', 'sbc', 'xor', 'cp']
+        imm = self.fetch()
+        return "%s (%s + %s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
+
+      elif i_opcode == 0xCB: # BIT INSTRUCTIONS:
+        bit_opcode = self.fetch()
+        ireg_offs = "(%s + %s)" % (ireg, hex8(self.fetch()))
+
+        if bit_opcode & 0xC0 == 0x00: # bit rotates and shifts
+          STR = ['rlc', 'rrc', 'rl', 'rr', 'sla', 'sra', 'sll', 'srl']
+          return "%s %s" % (STR[(bit_opcode >> 3) & 0x07], ireg_offs)
+
+        elif bit_opcode & 0xC0 == 0x40: # bit n, ??
+          n = (bit_opcode >> 3) & 7
+          return "bit %d, %s" % (n, ireg_offs)
+
+        elif bit_opcode & 0xC0 == 0x80: # res n, ??
+          n = (bit_opcode >> 3) & 7
+          return "res %d, %s" % (n, ireg_offs)
+
+        elif bit_opcode & 0xC0 == 0xC0: # set n, ??
+          n = (bit_opcode >> 3) & 7
+          return "set %d, %s" % (n, ireg_offs)
+
+        else:
+          self.illegal_instruction((opcode << 16) | (i_opcode << 8) | bit_opcode)
+          return "; DISASM ERROR! Illegal %s bit instruction (bit_opcode = %s)" % hex8(ireg, bit_opcode)
 
       else:
         self.illegal_instruction((opcode << 8) | i_opcode)
@@ -436,14 +473,18 @@ class MSX_Trace(ExecTrace):
 
       ext_instructions = {
         0x44: "neg",
+        0x49: "out (c), c",
         0x4C: "neg",
         0x52: "sbc hl, de",
         0x54: "neg",
         0x56: "im 1",
+        0x59: "out (c), e",
         0x5C: "neg",
         0x64: "neg",
+        0x69: "out (c), l",
         0x6C: "neg",
         0x74: "neg",
+        0x79: "out (c), a",
         0x7C: "neg",
         0xb0: "ldir",
       }

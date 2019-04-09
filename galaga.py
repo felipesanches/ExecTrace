@@ -49,18 +49,6 @@ KNOWN_VARS = {
 }
 
 KNOWN_SUBROUTINES = {
-  0x0047: ("WRTVDP", "Writes to the VDP register."),
-  0x004D: ("WRTVRM", "Writes to the VRAM addressed by [HL]."),
-  0x0056: ("FILVRM", "Fills the VRAM with the specified data."),
-  0x005C: ("LIDRVM", "Moves block of memory from memory to VRAM."),
-  0x0093: ("WRTPSG", "Writes data to the PSG register."),
-  0x0096: ("RDPSG", "Read data from the PSG register."),
-  0x0138: ("RSLREG", "Reads the current output to the primary slot register."),
-  0x013B: ("WSLREG", "Writes to the primary slot register."),
-  0x013E: ("RDVDP", "Reads the VPD status register."),
-  0x0141: ("SNSMAT", "Returns the status of a specified row of a keyboard matrix."),
-  0x0144: ("PHYDIO", "Performs operation for mass storage devices such as disks."),
-#-------------------------------------
   0x4017: ("ENTRY_POINT", ""),
   0x404A: ("LOOP", "wait for interrupts"),
   0x404C: ("INTERRUPT_HANDLER", ""),

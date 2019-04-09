@@ -121,6 +121,7 @@ class MSX_Trace(ExecTrace):
       0x2f: "cpl",
       0xd9: "exx",
       0xeb: "ex de, hl",
+      0xf3: "di",
       0xfb: "ei",
     }
 

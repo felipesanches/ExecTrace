@@ -417,7 +417,7 @@ class MSX_Trace(ExecTrace):
       elif i_opcode in [0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x77]: #
         STR = ['b', 'c', 'd', 'e', 'h', 'l', None, 'a']
         imm = self.fetch()
-        return "ld (%s + %s), %s" % (ireg, imm, STR[i_opcode & 3])
+        return "ld (%s + %s), %s" % (ireg, imm, STR[i_opcode & 7])
 
       elif i_opcode & 0xCF == 0x86: #
         STR = ['add a,', 'sub', 'and', 'or']
@@ -430,8 +430,8 @@ class MSX_Trace(ExecTrace):
         return "%s (%s + %s)" % (STR[(i_opcode >> 4) & 3], ireg, imm)
 
       elif i_opcode == 0xCB: # BIT INSTRUCTIONS:
-        bit_opcode = self.fetch()
         ireg_offs = "(%s + %s)" % (ireg, hex8(self.fetch()))
+        bit_opcode = self.fetch()
 
         if bit_opcode & 0xC0 == 0x00: # bit rotates and shifts
           STR = ['rlc', 'rrc', 'rl', 'rr', 'sla', 'sra', 'sll', 'srl']

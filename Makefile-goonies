@@ -1,0 +1,16 @@
+GAME=goonies
+
+all: rom disasm check
+
+check: disasm rom
+	md5sum $(GAME)*.rom
+
+disasm: $(GAME).py exec_trace.py msx_trace.py
+	./$(GAME).py $(GAME).rom
+
+rom:
+	z80asm $(GAME).asm
+	mv a.bin $(GAME)-new.rom
+
+run: rom
+	openmsx $(GAME)-new.rom

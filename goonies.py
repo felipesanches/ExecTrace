@@ -15,6 +15,7 @@ ENTRY_POINTS = [
 
 KNOWN_VARS = {
   0x4000: ("ROM_HEADER", "label"),
+  0x43E7: ("JUMP_TABLE_43E7", "jump_table", 1), # referenced from 0x40EA
 }
 
 KNOWN_SUBROUTINES = {

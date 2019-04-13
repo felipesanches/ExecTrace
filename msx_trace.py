@@ -18,7 +18,7 @@ MSX_BIOS_CALLS = {
   0x004D: ("WRTVRM", "Writes to the VRAM addressed by [HL]."),
   0x0053: ("SETWRT", "Sets up the VDP for write."),
   0x0056: ("FILVRM", "Fills the VRAM with the specified data."),
-  0x005C: ("LIDRVM", "Moves block of memory from memory to VRAM."),
+  0x005C: ("LDIRVM", "Moves block of memory from memory to VRAM."),
   0x0093: ("WRTPSG", "Writes data to the PSG register."),
   0x0096: ("RDPSG",  "Read data from the PSG register."),
   0x0138: ("RSLREG", "Reads the current output to the primary slot register."),

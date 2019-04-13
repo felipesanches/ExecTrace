@@ -86,15 +86,17 @@ class MSX_Trace(ExecTrace):
 
 
   def print_jp_HLs(self):
-    print('\n"JP (HL)" instructions found at:\n')
-    for j in self.jump_HLs:
-      print("\t0x%04X" % j)
+    if self.jump_HLs:
+      print('\n"JP (HL)" instructions found at:\n')
+      for j in self.jump_HLs:
+        print("\t0x%04X" % j)
 
 
   def print_stack_manipulation(self):
-    print('\nSuspicious stack manipulation instructions found at:\n')
-    for st in self.stack_tricks:
-      print("\t0x%04X" % st)
+    if self.stack_tricks:
+      print('\nSuspicious stack manipulation instructions found at:\n')
+      for st in self.stack_tricks:
+        print("\t0x%04X" % st)
 
 
   def output_disasm_headers(self):
@@ -542,12 +544,20 @@ class MSX_Trace(ExecTrace):
       return "; DISASM ERROR! Illegal instruction (opcode = %s)" % hex8(opcode)
 
 if __name__ == '__main__':
-  if len(sys.argv) != 2:
-    print("usage: {} <filename.rom>".format(sys.argv[0]))
+  if len(sys.argv) not in [2, 3]:
+    print("usage: {} <filename.rom> [addr]".format(sys.argv[0]))
   else:
     gamerom = sys.argv[1]
     print("disassembling {}...".format(gamerom))
-  
-    trace = MSX_Trace(gamerom)
-    trace.run()
+
+    try:
+      entry = int(sys.argv[2],16)
+      reloc = ((0x0000, entry, 102), )
+    except:
+      entry = 0x0000
+      reloc = None
+
+    trace = MSX_Trace(gamerom,
+                      relocation_blocks=reloc)
+    trace.run(entry_points=[entry])
     trace.save_disassembly_listing("{}.asm".format(gamerom.split(".")[0]))

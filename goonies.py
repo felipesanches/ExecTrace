@@ -25,6 +25,7 @@ KNOWN_SUBROUTINES = {
 # Stack manipulation instructions found at:
 #
 STACK_WHITELIST = [
+  0x4097, # stack pointer setup: "ld sp, 0xE600"
 ]
 
 

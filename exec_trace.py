@@ -138,17 +138,17 @@ class ExecTrace():
     
 
   def read_rom(self, filename):
+    rom_file = open(filename, "rb")
     if self.relocation_blocks:
       self.rom = []
-      rom = open(filename, "rb")
       for reloc_from, reloc_to, length in self.relocation_blocks:
-        rom.seek(reloc_from)
-        binary_data = rom.read(length)
+        rom_file.seek(reloc_from)
+        binary_data = rom_file.read(length)
         self.rom.append(binary_data)
     else:
-      self.rom = [open(filename).read()]
-      self.relocation_blocks = (0x0000, 0x0000, len(self.rom))
-    rom.close()
+      self.rom = [rom_file.read()]
+      self.relocation_blocks = (0x0000, 0x0000, len(self.rom[0]))
+    rom_file.close()
 
 
 ### Public method to start the binary code interpretation ###
@@ -474,7 +474,12 @@ class ExecTrace():
                 addr += 1
               continue
 
-            data.append(hex8(self.rom[reloc_index][physical_address]))
+            try:
+              data.append(hex8(self.rom[reloc_index][physical_address]))
+            except:
+              sys.exit("reloc_index={} physical_address={} rom_data_len={}".format(reloc_index,
+                                                                                   physical_address,
+                                                                                   len(self.rom[reloc_index])))
             if len(data) == 8:
               asm.write("{}db {}\n".format(indent, ", ".join(data)))
               indent = "\t"

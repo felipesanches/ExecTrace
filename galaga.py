@@ -37,6 +37,7 @@ KNOWN_VARS = {
   0x9CF3: ("MOTHERSHIP_B_45", "gfx"), # 32 bytes
   0x90E8: ("JUMP_TABLE_90E8", "jump_table", 6),
 
+#------
 #  0x4197: ("JUMP_TABLE_4197", "jump_table", 11),
 #  0x5357: ("JUMP_TABLE_5357", "jump_table", 12),
 #  0x5BE5: ("POINTERS_5BE5", "pointers", 9),
@@ -86,4 +87,5 @@ else:
   trace.print_jp_HLs()
   trace.print_stack_manipulation()
   trace.save_disassembly_listing("{}.asm".format(gamerom.split(".")[0]))
+  trace.generate_graph(True)
 

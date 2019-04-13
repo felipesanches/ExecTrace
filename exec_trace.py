@@ -154,6 +154,7 @@ class ExecTrace():
 ### Public method to start the binary code interpretation ###
   def run(self, entry_points=[0x0000]):
     self.pending_entry_points.extend(entry_points)
+    self.all_entry_points = [p for p in self.pending_entry_points]
     self.current_entry_point = self.pending_entry_points.pop(0)
     self.PC = self.current_entry_point
     self.register_label(self.current_entry_point)
@@ -238,13 +239,13 @@ class ExecTrace():
     else:
       return hex16(addr)
 
-  def getLabelName(self, addr):
+  def getLabelName(self, addr, prefix="LABEL_"):
     if addr in self.variables.keys():
       return self.variables[addr][0]
     elif addr in self.subroutines.keys():
       return self.subroutines[addr][0]
     else:
-      return "LABEL_%04X" % addr
+      return "%s%04X" % (prefix, addr)
 
 ### Private methods for computing the code-execution graph structure ###
   def already_visited(self, address):
@@ -503,3 +504,44 @@ class ExecTrace():
         next_addr = codeblock.end + 1
 
     asm.close()
+
+
+  def generate_graph(self, view=False):
+    def block_name(block):
+      return "{}\n{}".format(self.getLabelName(block.start, ""),
+                             self.getLabelName(block.end, ""))
+
+    import os
+    from graphviz import Digraph
+    dot = Digraph(comment='Code Execution Graph')
+    dot.attr('graph', overlap="false")
+    dot.attr('node', shape='box')
+    dot.attr('node', labelloc='c')
+    dot.attr('node', fontsize='12')
+    dot.attr('node', style='filled')
+    dot.attr('node', fontcolor="#000")
+
+    graph_dict = {}
+    for block in self.visited_ranges:
+      name = block_name(block)
+      if block.start in self.all_entry_points:
+        dot.attr('node', color='green')
+      else:
+        dot.attr('node', color='gray')
+      dot.node(name, name)
+      graph_dict[block.start] = name
+
+    for block in self.visited_ranges:
+      for nb in block.next_block:
+        if nb is str:
+          print(nb)  # this must be an illegal instruction
+        else:
+          if nb in graph_dict.keys():
+            dot.edge(graph_dict[block.start], graph_dict[nb])
+          else:
+            dot.edge(graph_dict[block.start], self.getLabelName(nb))
+            #print("Missing codeblock: {}".format(hex(nb)))
+
+    dot.render('output', view=view)
+    os.rename('output', 'output.gv')
+

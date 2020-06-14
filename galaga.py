@@ -29,7 +29,6 @@ KNOWN_VARS = {
   0x997B: ("NAMCO_TILES", "gfx"),
   0x9A23: ("A_Z_TILES", "gfx"),
   0x9B1B: ("LIFE", "gfx"),
-  #0x9B1B + 49*8: ("SHIP_00", "gfx"), # 16 bytes
   0x9CA3: ("SHIP_00", "gfx"), # 16 bytes
   0x9CB3: ("SHIP_45", "gfx"), # 32 bytes
   0x9CD3: ("MOTHERSHIP_A_00", "gfx"), # 16 bytes
@@ -38,21 +37,24 @@ KNOWN_VARS = {
   0x90E8: ("JUMP_TABLE_90E8", "jump_table", 6),
 
 #------
-#  0x4197: ("JUMP_TABLE_4197", "jump_table", 11),
-#  0x5357: ("JUMP_TABLE_5357", "jump_table", 12),
-#  0x5BE5: ("POINTERS_5BE5", "pointers", 9),
-#  0x95ED: ("POINTERS_95ED", "pointers", 8), # Note: A jump table would lead to weird BIOS call addresses...
-#  0x95FD: ("JUMP_TABLE_95FD", "jump_table", 13),
-#  0x97EC: ("POINTERS_97EC", "pointers", 3),
-#  0x97F2: ("LABEL_97F2", "label"), #gfx?
-#  0x980C: ("LABEL_980C", "label"), #gfx?
-#  0x98E6: ("LABEL_98E6", "label"), #gfx?
+  0x4197: ("JUMP_TABLE_4197", "jump_table", 11),
+  0x5357: ("JUMP_TABLE_5357", "jump_table", 12),
+  0x5BE5: ("POINTERS_5BE5", "pointers", 9),
+  0x95ED: ("POINTERS_95ED", "pointers", 8), # Note: A jump table would lead to weird BIOS call addresses...
+  0x95FD: ("JUMP_TABLE_95FD", "jump_table", 13),
+  0x97EC: ("POINTERS_97EC", "pointers", 3),
+  0x97F2: ("LABEL_97F2", "label"), #gfx?
+  0x980C: ("LABEL_980C", "label"), #gfx?
+  0x98E6: ("LABEL_98E6", "label"), #gfx?
 }
 
 KNOWN_SUBROUTINES = {
   0x4017: ("ENTRY_POINT", ""),
   0x404A: ("LOOP", "wait for interrupts"),
   0x404C: ("INTERRUPT_HANDLER", ""),
+  0x907E: ("_EXPLOSION_NOISE", ""),
+  0x8A9C: ("SETUP_GRAPHICS_MODE_1", ""),
+  0x8AA1: ("SETUP_GRAPHICS_MODE_2", ""),
 }
 
 # Stack manipulation instructions found at:
@@ -87,5 +89,5 @@ else:
   trace.print_jp_HLs()
   trace.print_stack_manipulation()
   trace.save_disassembly_listing("{}.asm".format(gamerom.split(".")[0]))
-  trace.generate_graph(True)
+  #trace.generate_graph(True)
 

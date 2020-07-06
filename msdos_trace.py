@@ -59,6 +59,17 @@ class MSDOS_Trace(ExecTrace):
       print(f"Registering IVT entry: 0x{value:04X}")
       self.schedule_entry_point(0x280 + value) # FIXME! the correct value will not always be 0x280 here.
 
+  def reg8(self, value):
+    return ["al", "cl", "dl", "bl",
+            "ah", "ch", "dh", "bh"][value & 7]
+
+  def reg16(self, value):
+    return ["ax", "cx", "dx", "bx",
+            "sp", "bp", "si", "di"][value & 7]
+
+  def segment_reg(self, value):
+    return ["es", "cs", "ss", "ds"][value & 3]
+
   def disasm_instruction(self, opcode):
 
     if opcode == 0x26:
@@ -165,63 +176,57 @@ class MSDOS_Trace(ExecTrace):
         self.illegal_instruction(opcode << 8 | foo)
         return ""
 
-    elif opcode == 0x88:
-      foo = self.fetch()
-      if foo == 0x1e:
-        imm = self.fetch()
-        imm = imm | (self.fetch() << 8)
-        return f"mov {self.cur_segment}[{self.getVariableName(imm)}], bl"
-      else:
-        self.illegal_instruction(opcode << 8 | foo)
-        return ""
+    elif opcode & 0xFC == 0x88: # DATA TRANSFER
+                                # MOV = Move
+                                # Register/Memory to/from Register
+                                # 100010 d w | mod reg r/m
+      op1 = self.fetch()
+      d = (opcode > 1) & 1
+      w = opcode & 1
+      mod = (op1 >> 6) & 3
+      reg = (op1 >> 3) & 7
+      r_m = op1 & 7
 
-    elif opcode == 0x89:
-      foo = self.fetch()
-      if foo == 0x26:
-        imm = self.fetch()
-        imm = imm | (self.fetch() << 8)
-        return f"mov {self.cur_segment}[{self.getVariableName(imm)}], sp"
-      else:
-        self.illegal_instruction(opcode << 8 | foo)
-        return ""
+      if mod == 0b11: # r/m is treated as a REG field
+        if d==0: # from reg
+          if w==0: # byte instruction
+              return f"mov {self.segment_reg(reg)}, {self.reg8(r_m)}"
+          else: # w==1: word instruction
+              return f"mov {self.segment_reg(reg)}, {self.reg16(r_m)}"
+        else: # d==1: to reg
+          if w==0: # byte instruction
+              return f"mov {self.reg8(r_m)}, {self.segment_reg(reg)}"
+          else: # w==1: word instruction
+              return f"mov {self.reg16(r_m)}, {self.segment_reg(reg)}"
 
-    elif opcode == 0x8a:
-      foo = self.fetch()
-      if foo == 0x26:
-        imm = self.fetch()
-        imm = imm | (self.fetch() << 8)
-        return f"mov ah, {self.cur_segment}[{self.getVariableName(imm)}]"
-      elif foo == 0x1e:
-        imm = self.fetch()
-        imm = imm | (self.fetch() << 8)
-        return f"mov bl, {self.cur_segment}[{self.getVariableName(imm)}]"	
-      else:
-        self.illegal_instruction(opcode << 8 | foo)
-        return ""
+      elif mod == 0b00: # ...FIXME!
+        if op1 & 0b11000111 == 0b110:  # FIXME!
+          imm = self.fetch()
+          imm = imm | (self.fetch() << 8)
+          if w==0: # byte instruction
+            return f"mov {self.reg8(reg)}, {self.cur_segment}[{self.getVariableName(imm)}]"
+          else: # w==1: word instruction
+            return f"mov {self.reg16(reg)}, {self.cur_segment}[{self.getVariableName(imm)}]"
 
-    elif opcode == 0x8b:
-      foo = self.fetch()
-      if foo == 0x26:  # mov sp, [iw]
-        imm = self.fetch()
-        imm = imm | (self.fetch() << 8)
-        return f"mov sp, {self.cur_segment}[{self.getVariableName(imm)}]"
-      elif foo == 0xd0:
-        return f"mov dx, ax"
-      elif foo == 0xf3:
-        return f"mov si, bx"
-      elif foo == 0xfb:
-        return f"mov di, bx"
-      else:
-        self.illegal_instruction(opcode << 8 | foo)
-        return ""
+      # FIXME!
+      self.illegal_instruction(opcode << 8 | op1)
+      return ""
 
-    elif opcode == 0x8c: # mov bx, es
-      foo = self.fetch()
-      if foo == 0xc3:
-        return f"mov bx, es"
+    elif opcode == 0x8c: # DATA TRANSFER
+                         # MOV = Move
+                         # Segment Register to Register/Memory
+                         # 10001100 mod 0 reg r/m
+      op1 = self.fetch()
+      mod = (op1 >> 6) & 3
+      zero = (op1 >> 5) & 1; assert zero == 0
+      reg = (op1 >> 3) & 3
+      r_m = op1 & 7
+      if mod == 0b11: # r/m is treated as a REG field
+        return f"mov {self.reg16(r_m)}, {self.segment_reg(reg)}"
       else:
-        self.illegal_instruction(opcode << 8 | foo)
-        return f""
+        # FIXME!
+        self.illegal_instruction(opcode << 8 | op1)
+        return ""
 
     elif opcode == 0x8f:
       foo = self.fetch()

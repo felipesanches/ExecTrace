@@ -111,6 +111,12 @@ class MSDOS_Trace(ExecTrace):
       imm = self.fetch()
       return f"and al, 0x{imm:02X}"
 
+    elif opcode == 0x2b: #SUB 	reg  r/m
+      op1 = self.fetch()
+      reg = (op1 >> 3) & 3
+      r_m = op1 & 7
+      return f"sub {self.reg16(reg)}, {self.reg16(r_m)}"
+
     elif opcode == 0x3d: # cmp ax, iw
       imm = self.fetch()
       imm = imm | (self.fetch() << 8)
@@ -186,27 +192,26 @@ class MSDOS_Trace(ExecTrace):
       mod = (op1 >> 6) & 3
       reg = (op1 >> 3) & 7
       r_m = op1 & 7
+      reg_str = self.segment_reg(reg)
 
       if mod == 0b11: # r/m is treated as a REG field
+        if w==0: # byte instruction
+          r_m_str = self.reg8(r_m)
+        else:
+          r_m_str = self.reg16(r_m)
+
         if d==0: # from reg
-          if w==0: # byte instruction
-              return f"mov {self.segment_reg(reg)}, {self.reg8(r_m)}"
-          else: # w==1: word instruction
-              return f"mov {self.segment_reg(reg)}, {self.reg16(r_m)}"
+          return f"mov {r_w_str}, {reg_str}"
         else: # d==1: to reg
-          if w==0: # byte instruction
-              return f"mov {self.reg8(r_m)}, {self.segment_reg(reg)}"
-          else: # w==1: word instruction
-              return f"mov {self.reg16(r_m)}, {self.segment_reg(reg)}"
+          return f"mov {reg_str}, {r_w_str}"
 
       elif mod == 0b00: # ...FIXME!
         if op1 & 0b11000111 == 0b110:  # FIXME!
           imm = self.fetch()
           imm = imm | (self.fetch() << 8)
-          if w==0: # byte instruction
-            return f"mov {self.reg8(reg)}, {self.cur_segment}[{self.getVariableName(imm)}]"
-          else: # w==1: word instruction
-            return f"mov {self.reg16(reg)}, {self.cur_segment}[{self.getVariableName(imm)}]"
+          if reg_str == "ax":
+            self.ax = imm
+          return f"mov {reg_str}, {self.cur_segment}[{self.getVariableName(imm)}]"
 
       # FIXME!
       self.illegal_instruction(opcode << 8 | op1)
@@ -227,6 +232,12 @@ class MSDOS_Trace(ExecTrace):
         # FIXME!
         self.illegal_instruction(opcode << 8 | op1)
         return ""
+
+    elif opcode == 0x8e: # MOV 	Seg 	r/m
+      op1 = self.fetch()
+      reg = (op1 >> 3) & 3
+      r_m = op1 & 7
+      return f"mov {self.segment_reg(reg)}, {self.reg16(r_m)}"
 
     elif opcode == 0x8f:
       foo = self.fetch()
@@ -258,6 +269,10 @@ class MSDOS_Trace(ExecTrace):
 
     elif opcode == 0xb4: # mov ah, ib
       imm = self.fetch()
+      try:
+        self.ax = imm << 8 | (self.ax & 0xFF)
+      except:
+        self.ax = imm << 8
       return f"mov ah, 0x{imm:02X}"
 
     elif opcode == 0xb8: # mov ax, iw
@@ -339,6 +354,13 @@ class MSDOS_Trace(ExecTrace):
     elif opcode == 0xe6:
       imm = self.fetch()
       return f"out 0x{imm:02X}, al"
+
+    elif opcode == 0xe8:
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      addr = (self.PC + twos_compl(addr)) & 0xFFFF
+      self.subroutine(addr)
+      return "call %s" % self.get_label(addr)
 
     elif opcode == 0xe9:
       addr = self.fetch()

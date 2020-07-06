@@ -67,6 +67,16 @@ class MSDOS_Trace(ExecTrace):
     return ["ax", "cx", "dx", "bx",
             "sp", "bp", "si", "di"][value & 7]
 
+  def ea_disp(self, r_m):
+    if r_m == 0: return "bx + si"
+    if r_m == 1: return "bx + di"
+    if r_m == 2: return "bp + si"
+    if r_m == 3: return "bp + di"
+    if r_m == 4: return "si"
+    if r_m == 5: return "di"
+    if r_m == 6: return "bp"
+    if r_m == 7: return "bx"
+
   def segment_reg(self, value):
     return ["es", "cs", "ss", "ds"][value & 3]
 
@@ -173,15 +183,20 @@ class MSDOS_Trace(ExecTrace):
         self.illegal_instruction(opcode << 8 | foo)
         return ""
 	
-    elif opcode == 0x83: # add bx, ib
-      foo = self.fetch()
+    elif opcode == 0x83: # op r/m, ib
+      op1 = self.fetch()
       imm = self.fetch()
-      if foo == 0xc3:
-        return f"add bx, 0x{imm:02X}"
-      else:
-        self.illegal_instruction(opcode << 8 | foo)
-        return ""
 
+      mod = (op1 >> 6) & 3
+      op = ["add", "or", "adc", "sbb",
+            "and", "sub", "xor", "cmp"][(op1 >> 3) & 7]
+      if mod == 0b11:
+        reg = self.reg16(op1 & 7)
+        return f"{op} {reg}, 0x{imm:02X}"
+      else:
+        imm2 = self.fetch()
+        ea = self.ea_disp(op1 & 7)
+        return f"{op} [{ea} + 0x{imm:02X}], 0x{imm2:02X}"
     elif opcode & 0xFC == 0x88: # DATA TRANSFER
                                 # MOV = Move
                                 # Register/Memory to/from Register

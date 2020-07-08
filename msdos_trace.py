@@ -13,6 +13,28 @@ def twos_compl(v):
     v -= (1 << 8)
   return v
 
+def twos_compl16(v):
+  if v & (1 << 15):
+    v -= (1 << 16)
+  return v
+
+assert twos_compl16(0x0001) == 0x0001
+assert twos_compl16(0x0FFF) == 0x0FFF
+assert twos_compl16(0x7FFF) == 0x7FFF
+assert twos_compl16(0xFFFF) == -1
+assert twos_compl16(0xFFFE) == -2
+assert twos_compl16(0x8000) == -0x8000
+assert twos_compl16(0x8001) == -0x7FFF
+
+assert twos_compl(0x01) == 0x01
+assert twos_compl(0x0F) == 0x0F
+assert twos_compl(0x7F) == 0x7F
+assert twos_compl(0xFF) == -1
+assert twos_compl(0xFE) == -2
+assert twos_compl(0x80) == -0x80
+assert twos_compl(0x81) == -0x7F
+
+
 class MSDOS_Trace(ExecTrace):
   def __init__(self,
                exefile,
@@ -107,11 +129,16 @@ class MSDOS_Trace(ExecTrace):
       0x9c: "pushf",
       0x9d: "popf",
       0xa4: "movsb",
+      0xf9: "stc",
       0xfa: "cli",
     }
 
     if opcode in simple_instructions:
       return simple_instructions[opcode]
+
+    elif opcode == 0x00: # FIXME!
+      imm = self.fetch()
+      return f"add FIXME:0x{imm:02X}"
 
     elif opcode == 0x0c:
       imm = self.fetch()
@@ -132,6 +159,11 @@ class MSDOS_Trace(ExecTrace):
       imm = imm | (self.fetch() << 8)
       return f"cmp ax, 0x{imm:04X}"
 
+    elif opcode & 0xE0 == 0x40:
+      reg = self.reg16(opcode & 7)
+      op = ["inc", "dec", "push", "pop"][(opcode >> 3) & 3] 
+      return f"{op} {reg}"
+
     elif opcode == 0x68: # push iw
       imm = self.fetch()
       imm = imm | (self.fetch() << 8)
@@ -140,6 +172,12 @@ class MSDOS_Trace(ExecTrace):
     elif opcode == 0x6a: # push ib
       imm = self.fetch()
       return f"push 0x{imm:02X}"
+
+    elif opcode == 0x70: # jo addr
+      imm = self.fetch()
+      addr = self.PC + twos_compl(imm)
+      self.conditional_branch(addr)
+      return "jo %s" % self.get_label(addr)
 
     elif opcode == 0x72: # jc addr
       imm = self.fetch()
@@ -159,29 +197,40 @@ class MSDOS_Trace(ExecTrace):
       self.conditional_branch(addr)
       return "jne %s" % self.get_label(addr)
 
-    elif opcode == 0x80: #  FIXME!
-      foo = self.fetch()
-      if foo == 0x3e:
-        addr = self.fetch()
-        addr = addr | (self.fetch() << 8)
-        imm = self.fetch()
-        return f"cmp [{self.getVariableName(addr)}], 0x{imm:02X}"
-      else:
-        self.illegal_instruction(opcode << 8 | foo)
-        return ""
-
-
-    elif opcode == 0x81: # add reg16, iw
-      foo = self.fetch()
+    elif opcode == 0x7d: # jnl addr
       imm = self.fetch()
-      imm = imm | (self.fetch() << 8)
-      if foo == 0xc3:
-        return f"add bx, 0x{imm:04X}"
-      elif foo == 0xc2:
-        return f"add dx, 0x{imm:04X}"
+      addr = self.PC + twos_compl(imm)
+      self.conditional_branch(addr)
+      return "jnl %s" % self.get_label(addr)
+
+    elif opcode & 0xFE == 0x80:
+      op1 = self.fetch()
+      op = ["add", "or", "adc", "sbb",
+            "and", "sub", "xor", "cmp"][(op1 >> 3) & 7]
+      addr = self.fetch()
+      addr = addr | (self.fetch() << 8)
+      imm = self.fetch()
+      if opcode & 1:
+        imm = self.fetch() << 8 | imm
+        return f"{op} [{self.getVariableName(addr)}], 0x{imm:04X}"
       else:
-        self.illegal_instruction(opcode << 8 | foo)
-        return ""
+        return f"{op} [{self.getVariableName(addr)}], 0x{imm:02X}"
+
+#    elif opcode & 0xFE == 0x82:
+#      op1 = self.fetch()
+#      op = ["add", None, "adc", "sbb",
+#            None, "sub", None, "cmp"][(op1 >> 3) & 7]
+#      addr = self.fetch()
+#      addr = addr | (self.fetch() << 8)
+#      imm = self.fetch()
+#      if op:
+#        if opcode & 1:
+#          return f"{op} [{self.getVariableName(addr)}], 0x{imm:02X}"
+#        else:
+#          return f"{op} [{self.getVariableName(addr)}], 0x{imm:02X}"
+#      else:
+#        self.illegal_instruction(opcode << 8 | op1)
+#        return ""
 	
     elif opcode == 0x83: # op r/m, ib
       op1 = self.fetch()
@@ -197,6 +246,7 @@ class MSDOS_Trace(ExecTrace):
         imm2 = self.fetch()
         ea = self.ea_disp(op1 & 7)
         return f"{op} [{ea} + 0x{imm:02X}], 0x{imm2:02X}"
+
     elif opcode & 0xFC == 0x88: # DATA TRANSFER
                                 # MOV = Move
                                 # Register/Memory to/from Register
@@ -321,6 +371,10 @@ class MSDOS_Trace(ExecTrace):
       imm = imm | (self.fetch() << 8)
       return f"lea di, 0x{imm:04X}"
 
+    elif opcode == 0xc3: # return from subroutine
+      self.return_from_subroutine()
+      return "retn"
+
     elif opcode == 0xcd: # int n
       imm = self.fetch()
       if self.ax & 0xff00 == 0x4C00 and imm == 0x21:
@@ -362,6 +416,12 @@ class MSDOS_Trace(ExecTrace):
         self.illegal_instruction(opcode << 8 | foo)
         return ""
 
+    elif opcode == 0xe2:
+      imm = self.fetch()
+      addr = self.PC + twos_compl(imm)
+      self.conditional_branch(addr)
+      return "loop %s" % self.get_label(addr)
+
     elif opcode == 0xe4:
       imm = self.fetch()
       return f"in al, 0x{imm:02X}"
@@ -373,14 +433,14 @@ class MSDOS_Trace(ExecTrace):
     elif opcode == 0xe8:
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
-      addr = (self.PC + twos_compl(addr)) & 0xFFFF
+      addr = (self.PC + twos_compl16(addr)) & 0xFFFF
       self.subroutine(addr)
       return "call %s" % self.get_label(addr)
 
     elif opcode == 0xe9:
       addr = self.fetch()
       addr = addr | (self.fetch() << 8)
-      addr = (self.PC + twos_compl(addr)) & 0xFFFF
+      addr = (self.PC + twos_compl16(addr)) & 0xFFFF
       self.unconditional_jump(addr)
       return "jmp %s" % self.get_label(addr)
 
@@ -401,13 +461,17 @@ class MSDOS_Trace(ExecTrace):
         return ""
 
     elif opcode == 0xff: # push ... FIXME!
-      foo = self.fetch()
-      if foo == 0x36:
+      op1 = self.fetch()
+      if op1 == 0x36:
         imm = self.fetch()
         imm = imm | (self.fetch() << 8)
         return f"push {self.cur_segment}[0x{imm:04X}]"
+      elif op1 == 0x1e:
+        imm = self.fetch()
+        imm = imm | (self.fetch() << 8)
+        return f"call dword ptr {self.cur_segment}[0x{imm:04X}]"
       else:
-        self.illegal_instruction(opcode << 8 | foo)
+        self.illegal_instruction(opcode << 8 | op1)
         return ""
     else:
       self.illegal_instruction(opcode)

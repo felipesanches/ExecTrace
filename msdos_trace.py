@@ -129,8 +129,14 @@ class MSDOS_Trace(ExecTrace):
       0x9c: "pushf",
       0x9d: "popf",
       0xa4: "movsb",
+      0xaa: "stosb",
+      0xab: "stosw",
+      0xec: "in al, dx",
+      0xee: "out dx, al",
+      0xef: "out dx, ax",
       0xf9: "stc",
       0xfa: "cli",
+      0xfb: "sti",
     }
 
     if opcode in simple_instructions:
@@ -140,6 +146,12 @@ class MSDOS_Trace(ExecTrace):
       imm = self.fetch()
       return f"add FIXME:0x{imm:02X}"
 
+    elif opcode == 0x0b:
+      op1 = self.fetch()
+      reg = (op1 >> 3) & 7
+      r_m = op1 & 7
+      return f"or {self.reg16(reg)}, {self.reg16(r_m)}"
+
     elif opcode == 0x0c:
       imm = self.fetch()
       return f"or al, 0x{imm:02X}"
@@ -148,11 +160,23 @@ class MSDOS_Trace(ExecTrace):
       imm = self.fetch()
       return f"and al, 0x{imm:02X}"
 
-    elif opcode == 0x2b: #SUB 	reg  r/m
+    elif opcode == 0x2b: # sub	reg  r/m
       op1 = self.fetch()
-      reg = (op1 >> 3) & 3
+      reg = (op1 >> 3) & 7
       r_m = op1 & 7
       return f"sub {self.reg16(reg)}, {self.reg16(r_m)}"
+
+    elif opcode == 0x32: # xor 	reg8  r/m8
+      op1 = self.fetch()
+      reg = (op1 >> 3) & 7
+      r_m = op1 & 7
+      return f"xor {self.reg8(reg)}, {self.reg8(r_m)}"
+
+    elif opcode == 0x33: # xor 	reg16  r/m16
+      op1 = self.fetch()
+      reg = (op1 >> 3) & 7
+      r_m = op1 & 7
+      return f"xor {self.reg16(reg)}, {self.reg16(r_m)}"
 
     elif opcode == 0x3d: # cmp ax, iw
       imm = self.fetch()
@@ -197,11 +221,23 @@ class MSDOS_Trace(ExecTrace):
       self.conditional_branch(addr)
       return "jne %s" % self.get_label(addr)
 
+    elif opcode == 0x77: # ja addr
+      imm = self.fetch()
+      addr = self.PC + twos_compl(imm)
+      self.conditional_branch(addr)
+      return "ja %s" % self.get_label(addr)
+
     elif opcode == 0x7d: # jnl addr
       imm = self.fetch()
       addr = self.PC + twos_compl(imm)
       self.conditional_branch(addr)
       return "jnl %s" % self.get_label(addr)
+
+    elif opcode == 0x7f: # jg addr
+      imm = self.fetch()
+      addr = self.PC + twos_compl(imm)
+      self.conditional_branch(addr)
+      return "jg %s" % self.get_label(addr)
 
     elif opcode & 0xFE == 0x80:
       op1 = self.fetch()
@@ -252,7 +288,7 @@ class MSDOS_Trace(ExecTrace):
                                 # Register/Memory to/from Register
                                 # 100010 d w | mod reg r/m
       op1 = self.fetch()
-      d = (opcode > 1) & 1
+      d = (opcode >> 1) & 1
       w = opcode & 1
       mod = (op1 >> 6) & 3
       reg = (op1 >> 3) & 7
@@ -266,12 +302,20 @@ class MSDOS_Trace(ExecTrace):
           r_m_str = self.reg16(r_m)
 
         if d==0: # from reg
-          return f"mov {r_w_str}, {reg_str}"
+          return f"mov {r_m_str}, {reg_str}"
         else: # d==1: to reg
-          return f"mov {reg_str}, {r_w_str}"
+          return f"mov {reg_str}, {r_m_str}"
 
       elif mod == 0b00: # ...FIXME!
-        if op1 & 0b11000111 == 0b110:  # FIXME!
+        if op1 & 7 == 5:
+          ea = self.ea_disp(op1 & 7)
+          if w==0:
+            reg_str = self.reg8(reg)
+          else:
+            reg_str = self.reg16(reg)
+          return f"mov {reg_str}, {self.cur_segment}[{ea}]"
+
+        elif op1 & 7 == 6:
           imm = self.fetch()
           imm = imm | (self.fetch() << 8)
           if reg_str == "ax":
@@ -450,12 +494,17 @@ class MSDOS_Trace(ExecTrace):
       self.unconditional_jump(addr)
       return "jmp %s" % self.get_label(addr)
 
-    elif opcode == 0xf7: # neg
+    elif opcode == 0xf7: #FIXME!
       foo = self.fetch()
       if foo == 0xdb:
         return f"neg bx"
+      elif foo == 0xc1:
+        imm = self.fetch()
+        return f"test cx, 0x{imm:02X}"
       elif foo == 0xe1:
         return f"mul cx"
+      elif foo == 0xe3:
+        return f"mul bx"
       else:
         self.illegal_instruction(opcode << 8 | foo)
         return ""

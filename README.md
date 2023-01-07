@@ -6,8 +6,22 @@ One example is the MSX disassembler below.
 
 Yet another example is the tooling for disassembling the bytecode of the virtual machine of the Another World game, by Eric Chahi, which I implemented in a separate repo at: https://github.com/felipesanches/AnotherWorld_VMTools/
 
-# msx_trace.py
+## msx_trace.py
 
 Targetting the Z80 CPU and the MSX1 architecture. Initially focused on generating a nice disassembly of the Galaga ROM, so there are a few hardcoded jump_table addresses and the entry_point. But later I indend to cleanup and separate those galaga-specific portions and keep the code generic to disassemble other MSX ROMs.
 
 This works perfectly for disassembling the Galaga ROM, but surely still lacks support for CPU instructions not used in this particular ROM.
+
+## msdos_trace.py
+
+Work-in-progress. Targetting X86 CPU MSDOS executables.
+
+# Maintainer notes
+
+To cut a new release:
+
+  > rm -rf dist/
+  > python setup.py bdist_wheel --universal
+  > pip install twine
+  > twine upload dist/*
+

@@ -7,7 +7,7 @@
 #
 import sys
 
-from exec_trace import ExecTrace, ERROR, hex8, hex16
+from exectrace import ExecTrace, ERROR, hex8, hex16
 
 
 MSX_BIOS_CALLS = {
@@ -37,6 +37,7 @@ def twos_compl(v):
 class MSX_Trace(ExecTrace):
   def __init__(self,
                romfile,
+               rombank=0,
                loglevel=ERROR,
                relocation_blocks=None,
                variables={},
@@ -44,6 +45,7 @@ class MSX_Trace(ExecTrace):
                stack_whitelist=[]):
     subroutines.update(MSX_BIOS_CALLS)
     super(MSX_Trace, self).__init__(romfile,
+                                    rombank,
                                     loglevel,
                                     relocation_blocks,
                                     variables,
@@ -69,8 +71,8 @@ class MSX_Trace(ExecTrace):
       return self.subroutines[addr][0]
     elif addr in self.variables.keys():
       return self.variables[addr][0]
-    elif addr < 0x4000:
-      sys.exit("Unknown BIOS call: %s" % hex16(addr))
+#    elif addr < 0x4000:
+#      sys.exit("Unknown BIOS call: %s" % hex16(addr))
     else:
       return "LABEL_%04X" % addr
 
@@ -266,7 +268,7 @@ class MSX_Trace(ExecTrace):
 
     elif opcode & 0xC7 == 0xC0: # conditional ret
       STR = ['nz', 'z', 'nc', 'c', 'po', 'pe', 'p', 'm']
-      self.schedule_entry_point(self.PC)
+      self.schedule_entry_point(self.PC, needs_label=False)
       self.return_from_subroutine()
       return "ret %s" % STR[(opcode >> 3) & 7]
 

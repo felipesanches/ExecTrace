@@ -5,6 +5,12 @@
 
 import sys
 
+def hex8(v):
+    return "0x%02X" % v
+ 
+def hex16(v):
+    return "0x%04X" % v
+
 class CodeBlock():
     ''' A code block represents an address range in
         program memory. The range is specified by
@@ -33,6 +39,11 @@ class CodeBlock():
 ERROR = 0   # only critical messages
 VERBOSE = 1 # informative non-error msgs to the user
 DEBUG = 2   # debugging messages to the developer
+
+
+class AddressAlreadyVisited(Exception):
+    pass
+
 
 class ExecTrace():
     """ ExecTrace is a generic class that implements an
@@ -78,29 +89,119 @@ class ExecTrace():
              with operation code <opcode> could not
              be parsed as a valid known instruction.
     """
-    def __init__(self, romfile, rombank=0, loglevel=ERROR):
+    def __init__(self,
+                 romfile,
+                 rombank=0,
+                 loglevel=ERROR,
+                 relocation_blocks=None,
+                 variables={},
+                 subroutines={}):
         self.loglevel = loglevel
         self.rombank = rombank
-        self.rom = open(romfile, "rb").read()
+        self.relocation_blocks = relocation_blocks
+        self.variables = variables
+        self.subroutines = subroutines
         self.visited_ranges = []
         self.pending_labeled_entry_points = []
         self.pending_unlabeled_entry_points = []
+        self.pending_entry_points = []
         self.current_entry_point = None
-        self.current_entry_point_needs_label = False
         self.PC = None
         self.disasm = {}
+        self.labeled_addresses = []
+
+        self.read_rom(romfile)
+
+        to_register = []
+        for var_addr, var in self.variables.items():
+            self.register_label(var[0])
+            if var[1] in ["jump_table", "pointers"]:
+                for i in range(var[2]):
+                    ptr = self.read_word(var_addr + 2*i)
+                    to_register.append(ptr)
+                    if var[1] == "jump_table":
+                        self.pending_entry_points.append(ptr)
+
+        for ptr in to_register:
+            print("Register pointer %04X" % ptr)
+            if ptr not in self.variables.keys():
+                self.variables[ptr] = ("LABEL_%04X" % ptr, "label")
+            self.register_label(ptr)
+
+        for subr_addr in self.subroutines.keys():
+            self.register_label(subr_addr)
+
+
+    def read_word(self, addr):
+        value = self.read_byte(addr)
+        value = value | (self.read_byte(addr+1) << 8)
+        return value
+
+
+    def read_byte(self, addr):
+        reloc_index, physical_address = self.rom_address(addr)
+        return self.rom[reloc_index][physical_address]
+
+
+    def register_label(self, address):
+      if address not in self.labeled_addresses:
+        self.labeled_addresses.append(address)
+
+
+    def read_rom(self, filename):
+        rom_file = open(filename, "rb")
+        if self.relocation_blocks:
+            self.rom = []
+            for reloc_from, reloc_to, length in self.relocation_blocks:
+                rom_file.seek(reloc_from)
+                binary_data = rom_file.read(length)
+                self.rom.append(binary_data)
+        else:
+            self.rom = [rom_file.read()]
+            self.relocation_blocks = (0x0000, 0x0000, len(self.rom[0]))
+        rom_file.close()
+
 
 ### Public method to start the binary code interpretation ###
-    def run(self, entry_point=0x0000):
-        self.current_entry_point = entry_point
+    def run(self, entry_points=[0x0000]):
+        self.pending_entry_points.extend(entry_points)
+        self.all_entry_points = [p for p in self.pending_entry_points]
+        self.current_entry_point = self.pending_entry_points.pop(0)
         self.current_entry_point_needs_label = True
-        self.PC = entry_point
+        self.PC = self.current_entry_point
+        self.register_label(self.current_entry_point)
         while self.PC is not None:
             address = self.PC
-            opcode = self.fetch()
-            if opcode != -1:
+            try:
+                opcode = self.fetch()
                 self.disasm[address] = self.disasm_instruction(opcode)
                 self.log(DEBUG, hex(address) + ": " + self.disasm[address])
+            except AddressAlreadyVisited:
+                self.log(VERBOSE, "ALREADY BEEN AT {}!".format(hex(self.PC)))
+                self.log(DEBUG, "pending_entry_points: {}".format(self.pending_entry_points))
+                if self.PC > self.current_entry_point:
+                    self.add_range(start=self.current_entry_point,
+                                   end=self.PC-1,
+                                   needs_label=self.current_entry_point_needs_label,
+                                   exit=[self.PC])
+                self.restart_from_another_entry_point()
+
+
+    def getVariableName(self, addr):
+        if addr in self.variables.keys():
+            return self.variables[addr][0]
+        else:
+            return hex16(addr)
+
+
+    def getLabelName(self, addr, prefix="LABEL_"):
+        if addr in self.variables.keys():
+            return self.variables[addr][0]
+        elif addr in self.subroutines.keys():
+            return self.subroutines[addr][0]
+        else:
+            return "%s%04X" % (prefix, addr)
+
 
 ### Methods for declaring the behaviour of branching instructions ###
     def subroutine(self, address):
@@ -249,12 +350,23 @@ class ExecTrace():
         else:
             self.PC += 1
 
+
     def fetch(self):
-        value = self.rom[self.rombank + self.PC]
-        self.log(DEBUG, f"Fetch at {hex(self.PC)}: {hex(value)}")
-        if self.increment_PC() == -1:
-            return -1
+        if self.already_visited(self.PC):
+            raise AddressAlreadyVisited
+        else:
+            try:
+                index, offset = self.rom_address(self.PC)
+                value = self.rom[index][offset]
+            except:
+                #print("ROM index = %d / offset = %04X" % (index, offset))
+                sys.exit("Cannot fetch at PC=%s" % hex16(self.PC))
+
+            self.log(DEBUG, "Fetch at {}: {}".format(hex(self.PC), hex(value)))
+            self.PC += 1
         return value
+
+
 
 ####### LOGGING #######
     def log(self, loglevel, msg):
@@ -300,52 +412,140 @@ class ExecTrace():
             current = [codeblock.start, codeblock.end]
             return grouped
 
+
+    def rom_address(self, logical_address):
+        for index, reloc in enumerate(self.relocation_blocks):
+            reloc_from, reloc_to, length = reloc
+            if (logical_address >= reloc_to and
+                logical_address < reloc_to + length):
+                offset = logical_address - reloc_to
+                return index, offset
+        sys.exit("The logical address %04X was not found on any relocation block." % logical_address)
+
+
     def save_disassembly_listing(self, filename="output.asm"):
+
+        var_addrs = sorted(self.variables.keys())
+
+        self.next_var = -1
+        def select_next_var_address(addr):
+            for var in var_addrs:
+                if var >= addr:
+                    self.next_var = var
+                    return
+
         asm = open(filename, "w")
         asm.write(self.output_disasm_headers())
 
-        next_addr = 0
-        for codeblock in sorted(self.visited_ranges, key=lambda cb: cb.start):
-            if codeblock.start < next_addr:
-                # Skip repeated blocks!
-                # something wrong happened here
-                # I once saw a single byte range "LABEL_25D8: break" showing up twice here...
-                continue
+        for reloc_from, reloc_to, reloc_length in self.relocation_blocks:
+            ranges = [r for r in sorted(self.visited_ranges, key=lambda cb: cb.start)
+                      if r.start >= reloc_to and r.end < reloc_to + reloc_length]
 
-            if codeblock.start > next_addr:
-                if codeblock.needs_label == True:
-                    label = self.get_label(next_addr)
-                    if len(label) <= 10:
-                        indent = f"{label}: "
-                    else:
-                        indent = f"\n{label}:\n            "
+            asm.write("\n\n\torg %s\n" % hex16(reloc_to))
+            next_addr = reloc_to
+
+            # This is a hack to make the disasm output the final
+            # block of data in the end of a ROM image:
+            ranges.append(CodeBlock(start=reloc_to + reloc_length,
+                                    end=-1,
+                                    next_block=[]))
+
+            for codeblock in ranges:
+                if codeblock.start < next_addr: # Skip repeated blocks!
+                    continue
+
+                if codeblock.start > next_addr: # there's a block of data here
+                    indent = self.getLabelName(next_addr) + ":\n\t"
+                    data = []
+                    addr = next_addr
+                    while addr < codeblock.start:
+                        select_next_var_address(addr)
+                        if addr == self.next_var:
+                            if len(data) > 0:
+                                asm.write("{}db {}\n".format(indent, ", ".join(data)))
+                                data = []
+                            var = self.variables[self.next_var]
+                            indent = "%s:\n\t" % var[0]
+#============================================================================
+                            if var[1] == "str":
+                                n = var[2]
+                                the_string = ""
+                                for i in range(n):
+                                    reloc_index, physical_address = self.rom_address(addr)
+                                    the_string += chr(self.rom[reloc_index][physical_address])
+                                    addr += 1
+                                asm.write('{}db "{}"\n'.format(indent, the_string))
+                                indent = self.getLabelName(addr) + ":\n\t"
+                                data = []
+                                continue
+#============================================================================
+                            elif var[1] == "n-1_str":
+                                reloc_index, physical_address = self.rom_address(addr)
+                                n = self.rom[reloc_index][physical_address]
+                                the_string = ""
+                                addr += 1
+                                for i in range(n-1):
+                                    reloc_index, physical_address = self.rom_address(addr)
+                                    the_string += chr(self.rom[reloc_index][physical_address])
+                                    addr += 1
+                                asm.write('{}db {}, "{}"\n'.format(indent, n, the_string))
+                                indent = self.getLabelName(addr) + ":\n\t"
+                                data = []
+                                continue
+#============================================================================
+                            if var[1] in ["jump_table", "pointers"]:
+                                n = var[2]
+                                asm.write("\n")
+                                for i in range(n):
+                                    reloc_index, physical_address = self.rom_address(addr)
+                                    jump_addr = self.rom[reloc_index][physical_address]
+                                    addr += 1
+                                    reloc_index, physical_address = self.rom_address(addr)
+                                    jump_addr = jump_addr | (self.rom[reloc_index][physical_address] << 8)
+                                    addr += 1
+                                    asm.write('{}dw {}\n'.format(indent, self.getLabelName(jump_addr)))
+                                    indent = "\t"
+                                indent = self.getLabelName(addr) + ":\n\t"
+                                data = []
+                                continue
+#============================================================================
+                        try:
+                            reloc_index, physical_address = self.rom_address(addr)
+                        except:
+                            if len(data) > 0:
+                                asm.write("{}db {}\n".format(indent, ", ".join(data)))
+                                data = []
+                                addr += 1
+                            continue
+
+                        try:
+                            data.append(hex8(self.rom[reloc_index][physical_address]))
+                        except:
+                            sys.exit("reloc_index={} physical_address={} rom_data_len={}".format(reloc_index,
+                                                                                                 physical_address,
+                                                                                                 len(self.rom[reloc_index])))
+                        if len(data) == 8:
+                            asm.write("{}db {}\n".format(indent, ", ".join(data)))
+                            indent = "\t"
+                            data = []
+                        addr += 1
+
+                    if len(data) > 0:
+                        asm.write("{}db {}\n".format(indent, ", ".join(data)))
+
+                # TODO: Maybe we need to ensure codeblocks do not cross relocation block boundaries
+                #       If so, we may need to split them at the boundaries.
+                address = codeblock.start
+                if address in self.labeled_addresses:
+                    indent = "\n" + self.getLabelName(address) + ":\n\t"
                 else:
-                    indent = "            "
+                    indent = "\t"
+                for address in range(codeblock.start, codeblock.end+1):
+                    if address in self.disasm:
+                        asm.write("%s%s\n" % (indent, self.disasm[address]))
+                        indent = "\t"
+                next_addr = codeblock.end + 1
 
-                data = []
-                for addr in range(next_addr, codeblock.start):
-                    data.append(f"0x{self.rom[self.rombank + addr]:02X}")
-                    if len(data) == 8:
-                        asm.write(f"{indent}db {', '.join(data)}\n")
-                        indent = "            "
-                        data = []
-                if len(data) > 0:
-                    asm.write(f"{indent}db {', '.join(data)}\n")
-
-            address = codeblock.start
-            if codeblock.needs_label == True:
-                label = self.get_label(address)
-                if len(label) <= 10:
-                    indent = f"{label}: "
-                else:
-                    indent = f"\n{label}:\n            "
-            else:
-                indent = "            "
-            for address in range(codeblock.start, codeblock.end+1):
-                if address in self.disasm:
-                    asm.write(f"{indent}{self.disasm[address]}\n")
-                    indent = "            "
-            next_addr = codeblock.end + 1
         asm.close()
 
 

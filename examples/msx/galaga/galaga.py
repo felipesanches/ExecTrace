@@ -69,8 +69,8 @@ STACK_WHITELIST = [
 
 
 import sys
-from exec_trace import ERROR
-from msx_trace import MSX_Trace
+from exectrace import ERROR
+from exectrace.msx import MSX_Trace
 
 if len(sys.argv) != 2:
   print("usage: {} <filename.rom>".format(sys.argv[0]))

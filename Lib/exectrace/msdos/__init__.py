@@ -6,7 +6,7 @@
 #
 import sys
 
-from exec_trace import ExecTrace, ERROR, hex8, hex16
+from exectrace import ExecTrace, ERROR, hex8, hex16
 
 def twos_compl(v):
   if v & (1 << 7):

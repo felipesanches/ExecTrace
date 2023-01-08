@@ -1,19 +1,16 @@
-GAME=galaga
+GAME=goonies
 
 all: rom disasm check
 
 check: disasm rom
 	md5sum $(GAME)*.rom
 
-disasm: $(GAME).py exec_trace.py msx_trace.py
+disasm: $(GAME).py
 	./$(GAME).py $(GAME).rom
-	rm -f xaa xab
 
 rom:
 	z80asm $(GAME).asm
-	split -b 8192 a.bin
-	rm a.bin
-	cat xaa xaa xab xab > $(GAME)-new.rom
+	mv a.bin $(GAME)-new.rom
 
 run: rom
 	openmsx $(GAME)-new.rom

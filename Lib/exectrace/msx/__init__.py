@@ -37,7 +37,6 @@ def twos_compl(v):
 class MSX_Trace(ExecTrace):
   def __init__(self,
                romfile,
-               rombank=0,
                loglevel=ERROR,
                relocation_blocks=None,
                variables={},
@@ -45,7 +44,6 @@ class MSX_Trace(ExecTrace):
                stack_whitelist=[]):
     subroutines.update(MSX_BIOS_CALLS)
     super(MSX_Trace, self).__init__(romfile,
-                                    rombank,
                                     loglevel,
                                     relocation_blocks,
                                     variables,

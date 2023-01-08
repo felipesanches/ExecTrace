@@ -91,13 +91,11 @@ class ExecTrace():
     """
     def __init__(self,
                  romfile,
-                 rombank=0,
                  loglevel=ERROR,
                  relocation_blocks=None,
                  variables={},
                  subroutines={}):
         self.loglevel = loglevel
-        self.rombank = rombank
         self.relocation_blocks = relocation_blocks
         self.variables = variables
         self.subroutines = subroutines

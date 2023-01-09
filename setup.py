@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="exectrace",
-    version="0.0.3",
+    version="0.0.4",
     author="Felipe Corrêa da Silva Sanches",
     author_email="juca@members.fsf.org",
     description="Offers a CPU-agnostic mechanism for analysing binaries by mapping all possible code-paths.",

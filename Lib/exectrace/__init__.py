@@ -100,8 +100,6 @@ class ExecTrace():
         self.variables = variables
         self.subroutines = subroutines
         self.visited_ranges = []
-        self.pending_labeled_entry_points = []
-        self.pending_unlabeled_entry_points = []
         self.pending_entry_points = []
         self.current_entry_point = None
         self.PC = None
@@ -118,7 +116,7 @@ class ExecTrace():
                     ptr = self.read_word(var_addr + 2*i)
                     to_register.append(ptr)
                     if var[1] == "jump_table":
-                        self.pending_entry_points.append(ptr)
+                        self.schedule_entry_point(ptr, needs_label=True)
 
         for ptr in to_register:
             print("Register pointer %04X" % ptr)
@@ -162,12 +160,12 @@ class ExecTrace():
 
 ### Public method to start the binary code interpretation ###
     def run(self, entry_points=[0x0000]):
-        self.pending_entry_points.extend(entry_points)
-        self.all_entry_points = [p for p in self.pending_entry_points]
-        self.current_entry_point = self.pending_entry_points.pop(0)
-        self.current_entry_point_needs_label = True
-        self.PC = self.current_entry_point
-        self.register_label(self.current_entry_point)
+        for p in entry_points:
+            self.schedule_entry_point(p, needs_label=True)
+
+        self.restart_from_another_entry_point()
+        self.register_label(self.current_entry_point) # I think this is not needed.
+
         while self.PC is not None:
             address = self.PC
             try:
@@ -294,16 +292,10 @@ class ExecTrace():
         return False
 
     def restart_from_another_entry_point(self):
-        if len(self.pending_labeled_entry_points) == 0 and len(self.pending_unlabeled_entry_points) == 0:
+        if len(self.pending_entry_points) == 0:
             self.PC = None  # This will finish the crawling
         else:
-            if len(self.pending_labeled_entry_points) > 0:
-                address = self.pending_labeled_entry_points.pop()
-                self.current_entry_point_needs_label = True
-            else:
-                address = self.pending_unlabeled_entry_points.pop()
-                self.current_entry_point_needs_label = False
-
+            address, self.current_entry_point_needs_label = self.pending_entry_points.pop()
             self.current_entry_point = address
             self.PC = address
             self.log(VERBOSE, "Restarting from: {}".format(hex(address)))
@@ -323,30 +315,13 @@ class ExecTrace():
             # even after it was already visited once not originally needing a label.
             return
 
-        if needs_label:
-            if address not in self.pending_labeled_entry_points:
-                self.pending_labeled_entry_points.append(address)
-        else:
-            if address not in self.pending_unlabeled_entry_points:
-                self.pending_unlabeled_entry_points.append(address)
+        for ep, _ in self.pending_entry_points:
+            if ep == address:
+                return
 
+        self.pending_entry_points.append((address, needs_label))
         self.log(VERBOSE, "SCHEDULING: {}".format(hex(address)))
         self.log_status()
-
-
-    def increment_PC(self):
-        if self.already_visited(self.PC):
-            self.log(VERBOSE, "ALREADY BEEN AT {}!".format(hex(self.PC)))
-            self.log(DEBUG, "pending_labeled_entry_points: {}".format(self.pending_labeled_entry_points))
-            self.log(DEBUG, "pending_unlabeled_entry_points: {}".format(self.pending_unlabeled_entry_points))
-            self.add_range(start=self.current_entry_point,
-                           end=self.PC-1,
-                           exit=[self.PC],
-                           needs_label=self.current_entry_point_needs_label)
-            self.restart_from_another_entry_point()
-            return -1
-        else:
-            self.PC += 1
 
 
     def fetch(self):
@@ -372,8 +347,7 @@ class ExecTrace():
             print(msg)
 
     def log_status(self):
-        self.log(VERBOSE, "Pending labeled: {}".format(list(map(hex, self.pending_labeled_entry_points))))
-        self.log(VERBOSE, "Pending unlabeled: {}".format(list(map(hex, self.pending_unlabeled_entry_points))))
+        self.log(VERBOSE, "Pending entry points: {}".format(list(map(lambda ep: (hex(ep[0]), ep[1]), self.pending_entry_points))))
 
     def log_ranges(self):
         results = []

@@ -49,12 +49,12 @@ KNOWN_VARS = {
 }
 
 KNOWN_SUBROUTINES = {
-  0x4017: ("ENTRY_POINT", ""),
+  0x4017: "ENTRY_POINT",
   0x404A: ("LOOP", "wait for interrupts"),
-  0x404C: ("INTERRUPT_HANDLER", ""),
-  0x907E: ("_EXPLOSION_NOISE", ""),
-  0x8A9C: ("SETUP_GRAPHICS_MODE_1", ""),
-  0x8AA1: ("SETUP_GRAPHICS_MODE_2", ""),
+  0x404C: "INTERRUPT_HANDLER",
+  0x907E: "_EXPLOSION_NOISE",
+  0x8A9C: "SETUP_GRAPHICS_MODE_1",
+  0x8AA1: "SETUP_GRAPHICS_MODE_2",
 }
 
 # Stack manipulation instructions found at:

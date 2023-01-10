@@ -42,7 +42,8 @@ class MSX_Trace(ExecTrace):
                variables={},
                subroutines={},
                stack_whitelist=[]):
-    subroutines.update(MSX_BIOS_CALLS)
+    # subroutines.update(MSX_BIOS_CALLS) # TODO: How can we make the disasm aware of the BIOS calls labels and addresses
+                                         #       but not attempt to disasm the BIOS?
     super(MSX_Trace, self).__init__(romfile,
                                     loglevel,
                                     relocation_blocks,
@@ -54,7 +55,10 @@ class MSX_Trace(ExecTrace):
 
   def imm16(self, v):
     if v in self.subroutines.keys():
-      return self.subroutines[v][0]
+      if isinstance(self.subroutines[v], tuple):
+        return self.subroutines[v][0]
+      else: # is string:
+        return self.subroutines[v]
     elif v in self.variables.keys():
       return self.variables[v][0]
     else:
@@ -62,15 +66,21 @@ class MSX_Trace(ExecTrace):
 
   def get_subroutine_comment(self, addr):
     if addr in self.subroutines.keys():
-      return self.subroutines[addr][1]
+      if isinstance(self.subroutines[addr], tuple):
+        return self.subroutines[addr][1]
+      else:
+        return None
 
   def get_label(self, addr):
     if addr in self.subroutines.keys():
-      return self.subroutines[addr][0]
+      if isinstance(self.subroutines[addr], tuple):
+        return self.subroutines[addr][0]
+      else: # is string:
+        return self.subroutines[addr]
     elif addr in self.variables.keys():
       return self.variables[addr][0]
-#    elif addr < 0x4000:
-#      sys.exit("Unknown BIOS call: %s" % hex16(addr))
+    #elif addr < 0x4000:
+    #  sys.exit("Unknown BIOS call: %s" % hex16(addr))
     else:
       return "LABEL_%04X" % addr
 
@@ -105,8 +115,12 @@ class MSX_Trace(ExecTrace):
 
     for addr, v in self.subroutines.items():
       if addr < 0x4000:
-        label, comment = v
-        header += "%s:\tequ %s\t; %s\n" % (label, hex16(addr), comment)
+        if isinstance(v, tuple):
+          label, comment = v
+          header += "%s:\tequ %s\t; %s\n" % (label, hex16(addr), comment)
+        else:
+          label = v
+          header += "%s:\tequ %s\n" % (label, hex16(addr))
 
     return header
 

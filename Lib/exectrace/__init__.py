@@ -94,11 +94,13 @@ class ExecTrace():
                  loglevel=ERROR,
                  relocation_blocks=None,
                  variables={},
-                 subroutines={}):
+                 subroutines={},
+                 labels={}):
         self.loglevel = loglevel
         self.relocation_blocks = relocation_blocks
         self.variables = variables
         self.subroutines = subroutines
+        self.labels = labels
         self.visited_ranges = []
         self.pending_entry_points = []
         self.current_entry_point = None
@@ -124,8 +126,8 @@ class ExecTrace():
                 self.variables[ptr] = ("LABEL_%04X" % ptr, "label")
             self.register_label(ptr)
 
-        for subr_addr in self.subroutines.keys():
-            self.register_label(subr_addr)
+        for s in subroutines:
+            self.schedule_entry_point(s, needs_label=True)
 
 
     def read_word(self, addr):
@@ -193,8 +195,8 @@ class ExecTrace():
     def getLabelName(self, addr, prefix="LABEL_"):
         if addr in self.variables.keys():
             return self.variables[addr][0]
-        elif addr in self.subroutines.keys():
-            return self.subroutines[addr][0]
+        elif addr in self.labels.keys():
+            return self.labels[addr]
         else:
             return "%s%04X" % (prefix, addr)
 
@@ -333,10 +335,13 @@ class ExecTrace():
                 value = self.rom[index][offset]
             except:
                 #print("ROM index = %d / offset = %04X" % (index, offset))
-                sys.exit("Cannot fetch at PC=%s" % hex16(self.PC))
+                #sys.exit("Cannot fetch at PC=%s" % hex16(self.PC))
+                self.restart_from_another_entry_point()
+                value = self.fetch()
+                # TODO: fix MSX BIOS calls reaching this condition.
 
-            self.log(DEBUG, "Fetch at {}: {}".format(hex(self.PC), hex(value)))
-            self.PC += 1
+        self.log(DEBUG, "Fetch at {}: {}".format(hex(self.PC), hex(value)))
+        self.PC += 1
         return value
 
 

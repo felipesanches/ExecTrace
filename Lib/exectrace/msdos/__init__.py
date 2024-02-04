@@ -131,6 +131,7 @@ class MSDOS_Trace(ExecTrace):
       0xa4: "movsb",
       0xaa: "stosb",
       0xab: "stosw",
+      0xac: "lodsb",
       0xec: "in al, dx",
       0xee: "out dx, al",
       0xef: "out dx, ax",

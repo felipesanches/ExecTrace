@@ -347,19 +347,30 @@ class ExecTrace():
 
 
 ####### LOGGING #######
+
     def log(self, loglevel, msg):
         if self.loglevel >= loglevel:
             print(msg)
 
     def log_status(self):
-        self.log(VERBOSE, "Pending entry points: {}".format(list(map(lambda ep: (hex(ep[0]), ep[1]), self.pending_entry_points))))
+        if self.loglevel < VERBOSE:
+            return
+
+        pending_entry_points = list(map(lambda ep: (hex(ep[0]), ep[1]),
+                                        self.pending_entry_points))
+        print(f"Pending entry points: {pending_entry_points}")
 
     def log_ranges(self):
+        if self.loglevel < DEBUG:
+            return
+
         results = []
         for codeblock in sorted(self.visited_ranges, key=lambda cb: cb.start):
-            results.append("[start: {}, end: {}]".format(hex(codeblock.start),
-                                                         hex(codeblock.end)))
-        self.log(DEBUG, "ranges:\n  " + "\n  ".join(results) + "\n")
+            results.append(f"[start: {hex(codeblock.start)},"
+                           f" end: {hex(codeblock.end)}]")
+        results = "\n  ".join(results)
+        print(f"ranges:\n{results}\n\n")
+
 #######################
 
     def print_grouped_ranges(self):
